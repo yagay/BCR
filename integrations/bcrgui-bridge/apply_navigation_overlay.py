@@ -13,8 +13,7 @@ marker = "BCR-SUITE-NAV-OVERLAY"
 def replace(path: str, old: str, new: str) -> None:
     p = gui / path
     original = p.read_text(encoding="utf-8")
-    if marker in original:
-        raise RuntimeError(f"Overlay already applied: {path}")
+    # Each replacement has its own unique anchor; a file can receive several edits.
     if original.count(old) != 1:
         raise RuntimeError(f"Upstream GUI changed, review overlay: {path}")
     p.write_text(original.replace(old, new), encoding="utf-8")
