@@ -23,3 +23,9 @@ This branch keeps BCR's original recorder, InCallService, Magisk ZIP and signing
 ## Unchanged fallback
 
 Original systemless install and `zipDebug` packaging still work. Do not publish this as a complete replacement until native capture and InCallService binding are verified on target devices.
+
+## Android 16 signature audit
+
+AOSP permission service checks accept `checkPermission(package, permission, userId)`, `checkPermission(package, permission, device, userId)`, and `checkUidPermission(uid, permission[, device])`. In this branch the hook classifier recognizes these **ordered** signatures, rather than searching all arguments for matching values. It will not hook an unknown method shape. The UID path checks package ownership and fails closed on lookup errors. Unit tests cover the signature classifier.
+
+CI has `workflow_dispatch` for manual re-runs where GitHub Actions is enabled. Actions can be disabled for a fork; this is a repository setting outside the code changes.

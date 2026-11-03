@@ -12,114 +12,114 @@ import java.lang.reflect.Method
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Experimental, narrowly scoped permission bridge for a user-installed BCR.
+ * Experimental, fail-closed Java permission bridge for *only* the BCR app.
  *
- * This only changes Java permission-service answers for BCR. It does not grant
- * package permissions in persistent state or bypass native audioserver policy.
- * A failed hook falls back to the original result.
+ * Not a replacement for privileged installation when native AudioPolicy or
+ * Telecom enforce privileges independently of the Java permission service.
  */
 class BcrModule : XposedModule() {
-    private val grantedCount = AtomicInteger(0)
+    private val grantLogCount = AtomicInteger(0)
+    private val uidLookupGuard = ThreadLocal<Boolean>()
 
     override fun onModuleLoaded(param: ModuleLoadedParam) {
-        Log.i(TAG, "Loaded in " + param.processName + " systemServer=" + param.isSystemServer)
+        Log.i(TAG, "Loaded process=${param.processName} systemServer=${param.isSystemServer}")
     }
 
     override fun onSystemServerStarting(param: SystemServerStartingParam) {
-        // Keep the experimental implementation off unsupported Android releases.
         if (Build.VERSION.SDK_INT < 36) {
-            Log.w(TAG, "Skipping permission bridge: unsupported Android release")
+            Log.i(TAG, "Skip: permission bridge requires Android 16+")
             return
         }
 
-        var count = 0
-        for (name in SERVICES) {
-            val clazz = try {
+        var installed = 0
+        for (name in SERVICE_CLASSES) {
+            val serviceClass = try {
                 Class.forName(name, false, param.classLoader)
             } catch (_: ClassNotFoundException) {
+                Log.i(TAG, "Not present: $name")
                 continue
             } catch (t: Throwable) {
-                Log.w(TAG, "Could not load " + name, t)
+                Log.w(TAG, "Unable to inspect $name", t)
                 continue
             }
-            for (method in clazz.declaredMethods.filter(::supportsSignature)) {
+
+            for (method in serviceClass.declaredMethods) {
+                val kind = PermissionMethodClassifier.classify(method) ?: continue
                 try {
                     method.isAccessible = true
-                    hook(method).setId("bcr-permissions").intercept(permissionHooker(method))
-                    count++
-                    Log.i(TAG, "Hooked " + method.toGenericString())
+                    hook(method).setId("bcr-permission-${kind.name.lowercase()}").intercept(
+                        permissionHooker(kind),
+                    )
+                    installed++
+                    Log.i(TAG, "Hook installed: ${method.toGenericString()}")
                 } catch (t: Throwable) {
-                    Log.w(TAG, "Failed to hook " + method.toGenericString(), t)
+                    Log.w(TAG, "Hook failed: ${method.toGenericString()}", t)
                 }
             }
         }
-        Log.i(TAG, "Permission hooks installed=" + count +
-            "; native AudioPolicy and Telecom compatibility still require device testing")
+        Log.i(TAG, "Installed permission hooks=$installed (Java only; verify real recording)")
     }
 
-    private fun supportsSignature(method: Method): Boolean {
-        if (method.returnType != Int::class.javaPrimitiveType) return false
-        val types = method.parameterTypes
-        return when (method.name) {
-            // Package name and permission must both be present as strings.
-            "checkPermission" -> types.count { it == String::class.java } >= 2
-            // AOSP permission name followed by target uid.
-            "checkUidPermission" -> types.size >= 2 &&
-                types[0] == String::class.java && types[1] == Int::class.javaPrimitiveType
-            else -> false
-        }
-    }
+    private fun permissionHooker(kind: PermissionMethodClassifier.Kind) =
+        XposedInterface.Hooker { chain ->
+            val original = chain.proceed()
+            if (original != PackageManager.PERMISSION_DENIED) return@Hooker original
 
-    private fun permissionHooker(method: Method) = XposedInterface.Hooker { chain ->
-        val original = chain.proceed()
-        if (original != PackageManager.PERMISSION_DENIED) return@Hooker original
+            val args = chain.args
+            val permission = args.getOrNull(1) as? String ?: return@Hooker original
+            if (permission !in PRIVILEGED_PERMISSIONS) return@Hooker original
 
-        val args = chain.args
-        val permission = args.filterIsInstance<String>().firstOrNull { it in PRIVILEGED }
-            ?: return@Hooker original
-        val forBcr = if (method.name == "checkPermission") {
-            args.any { it == PACKAGE_NAME }
-        } else {
-            val uid = args.getOrNull(1) as? Int ?: return@Hooker original
-            belongsToBcr(uid)
-        }
+            val isBcr = when (kind) {
+                PermissionMethodClassifier.Kind.PACKAGE -> args.getOrNull(0) == PACKAGE_NAME
+                PermissionMethodClassifier.Kind.UID -> {
+                    val uid = args.getOrNull(0) as? Int ?: return@Hooker original
+                    belongsToBcr(uid)
+                }
+            }
+            if (!isBcr) return@Hooker original
 
-        if (!forBcr) return@Hooker original
-        if (grantedCount.incrementAndGet() <= MAX_LOGS) {
-            Log.w(TAG, "Experimental grant for BCR only: " + permission +
-                " via " + method.declaringClass.simpleName)
+            if (grantLogCount.incrementAndGet() <= MAX_GRANT_LOGS) {
+                Log.w(TAG, "Java permission override for BCR: $permission, kind=$kind")
+            }
+            PackageManager.PERMISSION_GRANTED
         }
-        PackageManager.PERMISSION_GRANTED
-    }
 
     private fun belongsToBcr(uid: Int): Boolean {
-        if (uid < Process.FIRST_APPLICATION_UID) return false
+        if (uid < Process.FIRST_APPLICATION_UID || uidLookupGuard.get() == true) return false
+        uidLookupGuard.set(true)
         return try {
-            // Use package-manager ownership, not caller Binder uid. Audioserver
-            // asks about another uid, so Binder.getCallingUid() is not BCR.
-            val globals = Class.forName("android.app.AppGlobals")
-            val pm = globals.getMethod("getPackageManager").invoke(null) ?: return false
-            val lookup = pm.javaClass.getMethod(
-                "getPackagesForUid", Int::class.javaPrimitiveType!!)
-            val names = lookup.invoke(pm, uid) as? Array<*> ?: return false
-            names.any { it == PACKAGE_NAME }
+            // Look up *the checked UID*; Binder.getCallingUid() belongs to the
+            // service caller and is not necessarily the recorded application's UID.
+            val appGlobals = Class.forName("android.app.AppGlobals")
+            val pm = appGlobals.getMethod("getPackageManager").invoke(null) ?: return false
+            val method = pm.javaClass.getMethod(
+                "getPackagesForUid", Int::class.javaPrimitiveType!!,
+            )
+            val packages = method.invoke(pm, uid) as? Array<*> ?: return false
+            packages.any { it == PACKAGE_NAME }
         } catch (t: Throwable) {
-            Log.w(TAG, "Cannot verify uid=" + uid + "; keeping original permission result", t)
+            // Never grant a permission when package identity can't be proven.
+            Log.w(TAG, "UID ownership query unavailable; keep denial", t)
             false
+        } finally {
+            uidLookupGuard.remove()
         }
     }
 
     private companion object {
         const val TAG = "BCR/LSPosed"
         const val PACKAGE_NAME = "com.chiller3.bcr"
-        const val MAX_LOGS = 8
-        val PRIVILEGED = setOf(
+        const val MAX_GRANT_LOGS = 8
+        val PRIVILEGED_PERMISSIONS = setOf(
             "android.permission.CAPTURE_AUDIO_OUTPUT",
             "android.permission.CONTROL_INCALL_EXPERIENCE",
         )
-        val SERVICES = listOf(
-            "com.android.server.pm.permission.PermissionManagerServiceImpl",
+        val SERVICE_CLASSES = listOf(
+            // Newer AOSP permission manager.
             "com.android.server.permission.access.permission.PermissionService",
+            // Older and vendor permission service implementations.
+            "com.android.server.pm.permission.PermissionManagerServiceImpl",
+            "com.android.server.pm.permission.PermissionManagerService",
         )
     }
 }
