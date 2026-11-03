@@ -26,6 +26,13 @@ jobs:
           npm ci
           npm run build
           npx cap copy android
+      - name: Apply AGP compatibility fix to installed Capacitor 6 packages
+        shell: bash
+        run: |
+          # Never modify the pinned BCR-GUI source or either upstream repository.
+          # AGP 9 rejects a legacy ProGuard default filename used by Capacitor 6.
+          find external/bcr-gui/node_modules -type f -name build.gradle -print0 |
+            xargs -0 -r sed -i 's/proguard-android[.]txt/proguard-android-optimize.txt/g'
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:

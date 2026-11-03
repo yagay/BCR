@@ -65,3 +65,11 @@ combined app must select the recordings folder again.
 
 Do not merge this integration into `master` until the combined app
 is built and real-device-tested.
+
+## Downstream compatibility shims
+
+Suite CI currently patches only **installed** `node_modules` Android Gradle
+scripts to replace AGP's removed `proguard-android.txt` option with
+`proguard-android-optimize.txt`. Neither upstream repository source nor
+submodule commit changes. This integration shim can be removed once the
+Capacitor dependency is upgraded or can build natively with AGP 9.
