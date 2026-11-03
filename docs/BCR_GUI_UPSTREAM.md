@@ -10,7 +10,9 @@
   It compiles GUI's original Java, resources and Capacitor built web
   assets as an Android library, without copying its source history.
 - The app module includes this library only with `-PsuiteEnabled=true`.
-  The app still has just one launcher, `com.chiller3.bcr`.
+  The Suite's only enabled launcher is the BCR-GUI bridge activity. The BCR
+  `SettingsActivity` is opened from inside GUI and its existing launcher alias
+  remains enabled only for standalone BCR builds.
 
 ## Updating either upstream separately
 
@@ -81,3 +83,23 @@ so that `assets/capacitor.plugins.json` is generated. The resulting APK
 is inspected for this file, the GUI web entry, and the original BCR
 LSPosed module resources. Without plugin registration the GUI's
 Capacitor-native features can fail even when the APK compiles.
+
+## GUI-first navigation (Suite overlay)
+
+The merged Suite APK launches `SuiteGuiActivity` directly, which extends
+the unchanged GUI `MainActivity`. The original BCR Settings launcher alias
+is disabled via `bcrSettingsLauncherEnabled` placeholder **only** when
+`-PsuiteEnabled=true`, so standalone BCR behaves as before.
+
+The Suite native bridge registers a `BcrSuite` Capacitor plugin with a single
+`openBcrSettings` action. It launches the original BCR
+`com.chiller3.bcr.settings.SettingsActivity` as an internal screen;
+Android Back returns to BCR-GUI. No privileged permissions are exposed
+to JavaScript.
+
+The `integrations/bcrgui-bridge/apply_navigation_overlay.py` script
+modifies **only the temporary Git-submodule worktree at build time**,
+inserting a BCR entry in GUI's side navigation and Settings page.
+There are no commits to `yagay/bcr-gui` or its original upstream.
+The overlay deliberately fails when the relevant GUI templates change
+so that upstream merges cannot silently remove the BCR entry.

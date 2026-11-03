@@ -196,7 +196,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             onVoipOpen = {
                 context.startActivity(Intent(context, VoipSettingsActivity::class.java))
             },
-            onGuiOpen = { context.startActivity(Intent().setClassName(context.packageName, "com.github.nicorac.bcrgui.MainActivity")) },
+            onGuiOpen = { context.startActivity(Intent().setClassName(context.packageName, "com.chiller3.bcr.suite.SuiteGuiActivity")) },
             onIntegrationOpen = {
                 context.startActivity(Intent(context, IntegrationActivity::class.java))
             },

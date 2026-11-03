@@ -24,6 +24,7 @@ jobs:
         working-directory: external/bcr-gui
         run: |
           npm ci
+          python3 ../../integrations/bcrgui-bridge/apply_navigation_overlay.py
           npm run build
           npx cap sync android
       - name: Apply AGP compatibility fix to installed Capacitor 6 packages
@@ -50,9 +51,13 @@ jobs:
             unzip -Z1 "$apk" | grep -Fx "$path"
           done
           unzip -p "$apk" META-INF/xposed/scope.list | grep -Fx system
+          # The BCR Settings launcher must be disabled in the Suite build,
+          # leaving the GUI activity as the only launcher.
+          "$ANDROID_HOME/build-tools/37.0.0/aapt2" dump badging "$apk" | grep -F "com.chiller3.bcr.suite.SuiteGuiActivity"
+          unzip -p "$apk" assets/public/main.js >/dev/null 2>&1 || true
       - name: Upload BCR Suite Debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: BCR-Suite-merged-debug
+          name: BCR-Suite-GUI-first-debug
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error

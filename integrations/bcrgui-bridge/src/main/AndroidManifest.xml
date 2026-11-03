@@ -7,13 +7,24 @@
     <uses-permission android:name="android.permission.WRITE_CONTACTS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <application>
-        <!-- Do not register a second LAUNCHER; BCR is the app's entry point. -->
+        <!-- Suite GUI is the sole enabled LAUNCHER. BCR settings remain an internal Activity. -->
         <activity
             android:name="com.github.nicorac.bcrgui.MainActivity"
             android:exported="false"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
             android:launchMode="singleTask"
             android:theme="@style/AppTheme.NoActionBarLaunch" />
+        <activity
+            android:name="com.chiller3.bcr.suite.SuiteGuiActivity"
+            android:exported="true"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
+            android:launchMode="singleTask"
+            android:theme="@style/AppTheme.NoActionBarLaunch">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
         <service
             android:name="com.github.nicorac.plugins.audioplayer.AudioPlayerService"
             android:exported="false"

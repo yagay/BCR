@@ -134,7 +134,9 @@ android {
         buildConfigField("String", "PROJECT_URL_AT_COMMIT",
             "\"${projectUrl}/tree/${gitVersionTriple.third.name}\"")
 
-        buildConfigField("boolean", "BCR_GUI_ENABLED", (providers.gradleProperty("suiteEnabled").orNull == "true").toString())
+        val suiteEnabled = providers.gradleProperty("suiteEnabled").orNull == "true"
+        manifestPlaceholders["bcrSettingsLauncherEnabled"] = (!suiteEnabled).toString()
+        buildConfigField("boolean", "BCR_GUI_ENABLED", suiteEnabled.toString())
         buildConfigField("String", "PROVIDER_AUTHORITY",
             "APPLICATION_ID + \".provider\"")
         resValue("string", "provider_authority", "$applicationId.provider")
