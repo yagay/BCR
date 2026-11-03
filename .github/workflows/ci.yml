@@ -40,7 +40,11 @@ jobs:
         if: always()
         shell: bash
         run: |
-          find "$HOME/.gradle/caches/modules-2/files-2.1/io.github.libxposed/api/102.0.0" -type f \\( -name '*.aar' -o -name '*.module' \\) -exec sha512sum {} \\; || true
+          cache="$HOME/.gradle/caches/modules-2/files-2.1/io.github.libxposed/api/102.0.0"
+          if [ -d "$cache" ]; then
+            find "$cache" -type f -name "*.aar" -exec sha512sum {} +
+            find "$cache" -type f -name "*.module" -exec sha512sum {} +
+          fi
 
       - name: Upload experimental APK for device testing
         uses: actions/upload-artifact@v4
