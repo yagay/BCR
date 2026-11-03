@@ -44,3 +44,25 @@ If **Installation mode** says *System application*, the original ZIP or a differ
 ### Native audio authorization
 
 On Android 16, `AudioServerPermissionProvider` synchronizes protected permission state to native audioserver. Java-only permission overrides are not a complete replacement for `CAPTURE_AUDIO_OUTPUT`, and Android documents voice-call capture as reserved for privileged preinstalled apps. If non-privileged APK testing fails despite Java permission checks, prefer a **minimal KernelSU privileged placement shim** over adding global SELinux exemptions or broadly patching audioserver. Such a shim would still require an initial boot-time integration and has not been implemented here.
+
+## Scope selection in LSPosed Manager (scope UI fix)
+
+Modern libxposed API 102 reads the module entry and recommended scope from the three
+`META-INF/xposed/` resources embedded in the APK, not the old `xposed_init` assets.
+Earlier experimental builds used `staticScope=true`, meaning the framework treated the
+`system` target as a fixed scope. Now `staticScope=false` allows managing the recommended
+scope in the LSPosed UI.
+
+1. Install the latest Debug APK; it should replace this same application package (keep existing signing consistent).
+2. In LSPosed Manager, open the BCR module and enable it.
+3. Scope should suggest **System Framework** (`system` / `system_server`). Select that scope.
+4. **Do not** select `android` or `com.android.phone` for this implementation. They have separate processes, and no BCR hooks are installed there.
+5. Reboot before checking the integration diagnostics. The Java-permission bridge does not guarantee native audio capture.
+
+If scopes are missing despite reinstalling, confirm the installed APK has
+`META-INF/xposed/{module.prop,java_init.list,scope.list}` and that the manager
+actually supports modern libxposed API 102. If no module is detected, inspect
+the LSPosed framework logs for rejection errors.
+
+CI now inspects all three files in the **built APK**, including `staticScope=false`
+and `scope.list=system`, rather than checking only the source tree.
