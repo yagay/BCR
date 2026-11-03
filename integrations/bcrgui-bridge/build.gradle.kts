@@ -34,6 +34,7 @@ dependencies {
     implementation(project(":kristianheljas-capacitor-app-restart"))
     implementation(project(":capacitor-native-settings"))
     implementation("androidx.appcompat:appcompat:1.7.1")
+    implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("androidx.documentfile:documentfile:1.1.0")
     implementation("androidx.media3:media3-exoplayer:1.4.1")
     implementation("androidx.media3:media3-session:1.4.1")
