@@ -129,3 +129,25 @@ AudioPolicy captures a system voice-communication playback mix, not a
 cryptographically authenticated stream identified by the selected package.
 Only enable recording for a call you are taking part in; do not assume
 other active voice sessions cannot be included in a recording.
+
+## Ordinary call recording loudness (PCM gain)
+
+The regular BCR `VOICE_CALL`/`VOICE_UPLINK`/`VOICE_DOWNLINK` recording path
+previously passed raw PCM straight to the encoder without a digital loudness
+adjustment. The **Output format → Recording volume boost** option now offers
+Off (default), +3 dB, +6 dB and +9 dB. The selected value is applied to
+16-bit PCM in the existing encoding loop, independent of Opus/AAC/FLAC/WAV
+output format. A bounded soft-knee limiter reduces sudden peak clipping,
+although boosting a noisy or distorted source cannot restore quality.
+
+This does **not** alter system call volume, microphone hardware gain, the
+LSPosed permission hook or files already recorded. The VoIP Root
+AudioPolicy prototype remains separately implemented and is not affected
+by this setting.
+
+For a fair comparison with the phone's stock recorder, use the same
+call and playback device, try +3 dB first, then +6 dB, and check whether
+the BCR output is mono `VOICE_CALL` or stereo `VOICE_UPLINK_DOWNLINK`.
+A stereo recording downmixed by a player may be perceived as softer than
+a mixed mono recording. Digital gain cannot recover audio that Android
+does not capture.

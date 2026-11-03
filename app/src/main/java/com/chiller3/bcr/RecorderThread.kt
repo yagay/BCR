@@ -21,6 +21,7 @@ import com.chiller3.bcr.extension.listFilesWithPathsRecursively
 import com.chiller3.bcr.extension.phoneNumber
 import com.chiller3.bcr.extension.threadIdCompat
 import com.chiller3.bcr.extension.toDocumentFile
+import com.chiller3.bcr.audio.PcmGain
 import com.chiller3.bcr.format.Encoder
 import com.chiller3.bcr.format.Format
 import com.chiller3.bcr.output.CallMetadata
@@ -41,6 +42,7 @@ import com.chiller3.bcr.output.Retention
 import com.chiller3.bcr.rule.RecordRule
 import kotlinx.serialization.json.Json
 import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.time.Duration
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.max
@@ -166,6 +168,7 @@ class RecorderThread(
 
     // Sources
     private val sources: Array<Int>
+    private val pcmGain: PcmGain
 
     init {
         Log.i(tag, "Created thread for call: $parentCall")
@@ -178,6 +181,7 @@ class RecorderThread(
         sampleRate = savedFormat.sampleRate ?: format.sampleRateInfo.default
 
         sources = savedFormat.audioSource.sources
+        pcmGain = PcmGain(prefs.recordingGainDb)
     }
 
     fun onCallDetailsChanged(call: Call, details: Call.Details) {
@@ -689,11 +693,14 @@ class RecorderThread(
         val baseSize = bufSize * factor
 
         // Input buffers for each AudioRecord.
-        val buffersIn = audioRecords.map { ByteBuffer.allocateDirect(baseSize) }
+        val buffersIn = audioRecords.map {
+            ByteBuffer.allocateDirect(baseSize).order(ByteOrder.nativeOrder())
+        }
         // Output buffer for interleaved channels. This is intentionally not a direct ByteBuffer
         // because it's only ever accessed from the JVM side. This makes the interleaving much
         // faster compared to using a direct ByteBuffer.
         val bufferOut = ByteBuffer.allocate(baseSize * audioRecords.size)
+            .order(ByteOrder.nativeOrder())
         // Whether all input buffers have been flushed (encoded to bufferOut).
         var buffersFlushed = true
         // Size of output buffer in frames.
@@ -761,6 +768,9 @@ class RecorderThread(
 
             // If paused by the user or holding, keep recording, but throw away the data.
             if (!isPaused && !isHolding) {
+                // Apply optional gain to 16-bit PCM before any audio codec runs.
+                // A soft limiter prevents overflow on sudden loud speech.
+                pcmGain.apply(bufferOut)
                 encoder.encode(bufferOut, false)
                 numFramesEncoded += nWritten / frameSize
             } else {
