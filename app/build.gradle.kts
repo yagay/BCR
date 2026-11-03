@@ -225,19 +225,18 @@ val archive = tasks.register("archive") {
     outputs.file(outputFile)
 
     doLast {
-        val format = "tar_for_task_$name"
-
-        ArchiveCommand.registerFormat(format, TarFormat())
-        try {
-            outputFile.get().asFile.outputStream().use {
-                git.archive()
-                    .setTree(git.repository.resolve(gitVersionTriple.third.name))
-                    .setFormat(format)
-                    .setOutputStream(it)
-                    .call()
-            }
-        } finally {
-            ArchiveCommand.unregisterFormat(format)
+        // Gradle 9.8 / JGit 7.8 may recurse in ArchiveCommand.call() and
+        // throw StackOverflowError. Native git archive preserves the source
+        // snapshot without invoking the JGit archive implementation.
+        val target = outputFile.get().asFile
+        target.parentFile.mkdirs()
+        val process = ProcessBuilder(
+            "git", "-C", rootDir.absolutePath, "archive", "--format=tar",
+            "--output=${target.absolutePath}", gitVersionTriple.third.name,
+        ).redirectErrorStream(true).start()
+        val output = process.inputStream.bufferedReader().use { it.readText() }
+        check(process.waitFor() == 0) {
+            "git archive failed: ${output.take(1000)}"
         }
     }
 }
