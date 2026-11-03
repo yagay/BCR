@@ -28,12 +28,15 @@ object VoipShellCapture {
 
     @JvmStatic
     fun main(args: Array<String>) {
-        if (args.size != 2) {
-            System.err.println("BCR_VOIP_ERROR: expected output and stop-file paths")
+        if (args.size != 3) {
+            System.err.println("BCR_VOIP_ERROR: expected output, stop-file and owner PID")
             exitProcess(2)
         }
         val output = File(args[0])
         val stop = File(args[1])
+        val parentPid = args[2].toIntOrNull()?.takeIf { it > 1 }
+            ?: error("Invalid owner PID")
+        val owner = File("/proc/$parentPid")
         try {
             if (Looper.myLooper() == null) Looper.prepare()
             output.parentFile?.mkdirs()
@@ -50,7 +53,7 @@ object VoipShellCapture {
                     repeat(44) { wav.writeByte(0) }
                     println("BCR_VOIP_STARTED")
                     System.out.flush()
-                    while (!stop.exists() &&
+                    while (!stop.exists() && owner.exists() &&
                         android.os.SystemClock.elapsedRealtime() - begin < MAX_MS &&
                         bytes < MAX_BYTES) {
                         val count = it.read(pcm)
@@ -72,11 +75,13 @@ object VoipShellCapture {
                         }
                     }
                     writeWavHeader(wav, bytes)
+                    output.setReadable(true, false)
                     println("BCR_VOIP_FINISHED bytes=$bytes")
                 }
             }
             exitProcess(0)
         } catch (t: Throwable) {
+            output.setReadable(true, false)
             System.err.println("BCR_VOIP_ERROR: ${t.javaClass.simpleName}: ${t.message}")
             Log.e(TAG, "VoIP shell capture failed", t)
             exitProcess(1)

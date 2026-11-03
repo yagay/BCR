@@ -108,3 +108,12 @@ capture daemons.
 Note: Shell UID and Root UID have different Android permission and SELinux
 identities. This proof-of-concept uses Root and does not claim identical
 capabilities to ShizuCallRecorder/JemRec's Shell-UID daemons.
+
+### Output location and capture process safety
+
+Successful VoIP `.wav` files are first moved to the same configured BCR output
+folder as normal calls, under `VoIP/`. If that SAF operation fails, a copy is
+saved via MediaStore under `Recordings/BCR-VoIP`. The in-app status shows the
+actual destination. The recording process also stops if the BCR application
+process that launched it exits, or after the hard 2-hour limit. Audio capture
+continues to require explicit opt-in.

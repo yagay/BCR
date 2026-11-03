@@ -60,6 +60,6 @@ jobs:
       - name: Upload experimental APK for device testing
         uses: actions/upload-artifact@v4
         with:
-          name: BCR-lsposed-root-scope-fix-debug
+          name: BCR-voip-root-experimental-debug
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error

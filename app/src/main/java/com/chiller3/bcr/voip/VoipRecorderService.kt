@@ -16,6 +16,8 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
 import androidx.core.content.ContextCompat
+import androidx.documentfile.provider.DocumentFile
+import com.chiller3.bcr.output.OutputDirUtils
 import com.chiller3.bcr.R
 import java.io.File
 import java.text.SimpleDateFormat
@@ -114,7 +116,8 @@ class VoipRecorderService : Service() {
                 val apk = applicationInfo.sourceDir ?: error("Installed APK not found")
                 val cmd = "CLASSPATH=" + quote(apk) +
                     " /system/bin/app_process / com.chiller3.bcr.voip.VoipShellCapture " +
-                    quote(wav.absolutePath) + " " + quote(marker.absolutePath)
+                    quote(wav.absolutePath) + " " + quote(marker.absolutePath) + " " +
+                    android.os.Process.myPid()
                 val process = ProcessBuilder("su", "-c", cmd)
                     .redirectErrorStream(true).start()
                 val log = StringBuilder()
@@ -132,7 +135,7 @@ class VoipRecorderService : Service() {
                     // to other ordinary apps.
                     val saved = publish(wav)
                     VoipStatus.update(this, false,
-                        "VoIP playback saved to Recordings/BCR-VoIP. This may contain only the remote party.",
+                        "VoIP playback saved: $saved. This may contain only the remote party.",
                         saved)
                 } else {
                     VoipStatus.update(this, false,
@@ -153,6 +156,24 @@ class VoipRecorderService : Service() {
     }
 
     private fun publish(wav: File): String {
+        // Respect the same SAF output folder selected for normal BCR calls.
+        // A failed SAF move does not lose the recording: use MediaStore fallback.
+        try {
+            val destination = OutputDirUtils(this, OutputDirUtils.NULL_REDACTOR)
+                .moveToOutputDir(
+                    DocumentFile.fromFile(wav),
+                    listOf("VoIP", wav.name.removeSuffix(".wav")),
+                    "audio/wav",
+                )
+            return "BCR output/VoIP/${destination.name ?: wav.name}"
+        } catch (e: Exception) {
+            Log.w(tag, "Could not use configured BCR folder; using MediaStore", e)
+            if (!wav.exists()) throw e
+        }
+        return publishMediaStore(wav)
+    }
+
+    private fun publishMediaStore(wav: File): String {
         val values = ContentValues().apply {
             put(MediaStore.Audio.Media.DISPLAY_NAME, wav.name)
             put(MediaStore.Audio.Media.MIME_TYPE, "audio/wav")
@@ -169,7 +190,7 @@ class VoipRecorderService : Service() {
             contentResolver.update(uri, ContentValues().apply {
                 put(MediaStore.Audio.Media.IS_PENDING, 0)
             }, null, null)
-            return wav.name
+            return "Recordings/BCR-VoIP/${wav.name}"
         } catch (e: Exception) {
             contentResolver.delete(uri, null, null)
             throw e
