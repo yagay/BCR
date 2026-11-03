@@ -54,6 +54,7 @@ import com.chiller3.bcr.ui.PreferenceGap
 import com.chiller3.bcr.ui.PreferencesChangedEffect
 import com.chiller3.bcr.ui.SwitchPreference
 import com.chiller3.bcr.ui.theme.AppTheme
+import com.chiller3.bcr.voip.VoipSettingsActivity
 
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
@@ -192,6 +193,12 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 prefs.isDebugMode = enabled
                 reloadPrefs++
             },
+            onVoipOpen = {
+                context.startActivity(Intent(context, VoipSettingsActivity::class.java))
+            },
+            onIntegrationOpen = {
+                context.startActivity(Intent(context, IntegrationActivity::class.java))
+            },
             onSourceRepoOpen = {
                 val uri = BuildConfig.PROJECT_URL_AT_COMMIT.toUri()
                 try {
@@ -248,6 +255,8 @@ private fun SettingsContent(
     onNotificationOpenDirChange: (Boolean) -> Unit,
     onShowLauncherIconChange: (Boolean) -> Unit,
     onDebugModeChange: (Boolean) -> Unit,
+    onIntegrationOpen: () -> Unit,
+    onVoipOpen: () -> Unit,
     onSourceRepoOpen: () -> Unit,
     onForceDirectBootChange: (Boolean) -> Unit,
     onMigrateDirectBoot: () -> Unit,
@@ -382,11 +391,31 @@ private fun SettingsContent(
             )
         }
 
+        item(key = "integration") {
+            Preference(
+                onClick = onIntegrationOpen,
+                shapes = BetterSegmentedShapes.top(),
+                title = { Text(text = "LSPosed + Root integration") },
+                summary = { Text(text = "Experimental permission bridge and Root diagnostics") },
+                modifier = Modifier.animateItem(),
+            )
+        }
+
+        item(key = "voip") {
+            Preference(
+                onClick = onVoipOpen,
+                shapes = BetterSegmentedShapes.middle(),
+                title = { Text(text = "VoIP recording (experimental)") },
+                summary = { Text(text = "Selected apps, Root audio capture, notification detection") },
+                modifier = Modifier.animateItem(),
+            )
+        }
+
         item(key = "version") {
             Preference(
                 onClick = onSourceRepoOpen,
                 onLongClick = { onDebugModeChange(!isDebugMode) },
-                shapes = BetterSegmentedShapes.single(),
+                shapes = BetterSegmentedShapes.bottom(),
                 title = { Text(text = stringResource(R.string.pref_version_name)) },
                 summary = { Text(text = versionSummary(isDebugMode)) },
                 modifier = Modifier.animateItem(),
@@ -552,6 +581,8 @@ private fun PreviewSettingsScreen() {
                 onNotificationOpenDirChange = {},
                 onShowLauncherIconChange = {},
                 onDebugModeChange = {},
+                onIntegrationOpen = {},
+                onVoipOpen = {},
                 onSourceRepoOpen = {},
                 onForceDirectBootChange = {},
                 onMigrateDirectBoot = {},
