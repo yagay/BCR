@@ -34,7 +34,7 @@ jobs:
 
       - name: Build and test
         # Debug build only since release builds require a signing key
-        run: ./gradlew --no-daemon :app:assembleDebug :app:testDebugUnitTest zipDebug
+        run: ./gradlew --no-daemon --stacktrace :app:assembleDebug :app:testDebugUnitTest
 
       - name: Upload experimental APK for device testing
         uses: actions/upload-artifact@v4
