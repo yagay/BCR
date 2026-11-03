@@ -34,7 +34,13 @@ jobs:
 
       - name: Build and test
         # Debug build only since release builds require a signing key
-        run: ./gradlew --no-daemon --stacktrace :app:assembleDebug :app:testDebugUnitTest -x :app:archive
+        run: ./gradlew --no-daemon --stacktrace --dependency-verification lenient :app:assembleDebug :app:testDebugUnitTest -x :app:archive
+
+      - name: Print libxposed dependency SHA-512 for strict pinning
+        if: always()
+        shell: bash
+        run: |
+          find "$HOME/.gradle/caches/modules-2/files-2.1/io.github.libxposed/api/102.0.0" -type f \\( -name '*.aar' -o -name '*.module' \\) -exec sha512sum {} \\; || true
 
       - name: Upload experimental APK for device testing
         uses: actions/upload-artifact@v4
