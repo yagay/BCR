@@ -1,7 +1,8 @@
 on:
   push:
     branches:
-      - master\n      - feature/lsposed-root
+      - master
+      - feature/lsposed-root
   pull_request:
 jobs:
   build:
@@ -26,4 +27,10 @@ jobs:
       - name: Build and test
         # Debug build only since release builds require a signing key
         run: ./gradlew --no-daemon build zipDebug -x assembleRelease
-\n      - name: Upload experimental APK for device testing\n        uses: actions/upload-artifact@v4\n        with:\n          name: BCR-lsposed-root-debug\n          path: app/build/outputs/apk/debug/*.apk\n          if-no-files-found: error\n
+
+      - name: Upload experimental APK for device testing
+        uses: actions/upload-artifact@v4
+        with:
+          name: BCR-lsposed-root-debug
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error

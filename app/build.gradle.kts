@@ -163,6 +163,10 @@ android {
         sourceCompatibility(JavaVersion.VERSION_21)
         targetCompatibility(JavaVersion.VERSION_21)
     }
+    sourceSets {
+        getByName("main") { resources.srcDirs("src/main/resources") }
+    }
+    packaging.resources.merges += "META-INF/xposed/*"
     buildFeatures {
         buildConfig = true
         compose = true
@@ -209,7 +213,9 @@ dependencies {
     implementation(libs.material)
     implementation(libs.reorderable)
     debugImplementation(libs.androidx.compose.ui.tooling)
-    // LSPosed API classes are provided by the framework, not bundled into BCR.\n    compileOnly("io.github.libxposed:api:102.0.0")\n    testImplementation(libs.junit)
+    // The LSPosed runtime provides these classes at injection time.
+    compileOnly("io.github.libxposed:api:102.0.0")
+    testImplementation(libs.junit)
 }
 
 val archive = tasks.register("archive") {

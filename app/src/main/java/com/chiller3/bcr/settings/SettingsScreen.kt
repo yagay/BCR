@@ -192,7 +192,10 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 prefs.isDebugMode = enabled
                 reloadPrefs++
             },
-            onIntegrationOpen = {\n                context.startActivity(Intent(context, IntegrationActivity::class.java))\n            },\n            onSourceRepoOpen = {
+            onIntegrationOpen = {
+                context.startActivity(Intent(context, IntegrationActivity::class.java))
+            },
+            onSourceRepoOpen = {
                 val uri = BuildConfig.PROJECT_URL_AT_COMMIT.toUri()
                 try {
                     context.startActivity(Intent(Intent.ACTION_VIEW, uri))
@@ -248,7 +251,8 @@ private fun SettingsContent(
     onNotificationOpenDirChange: (Boolean) -> Unit,
     onShowLauncherIconChange: (Boolean) -> Unit,
     onDebugModeChange: (Boolean) -> Unit,
-    onIntegrationOpen: () -> Unit,\n    onSourceRepoOpen: () -> Unit,
+    onIntegrationOpen: () -> Unit,
+    onSourceRepoOpen: () -> Unit,
     onForceDirectBootChange: (Boolean) -> Unit,
     onMigrateDirectBoot: () -> Unit,
     onSaveLogs: () -> Unit,
@@ -382,11 +386,21 @@ private fun SettingsContent(
             )
         }
 
-        item(key = "integration") {\n            Preference(\n                onClick = onIntegrationOpen,\n                shapes = BetterSegmentedShapes.top(),\n                title = { Text(text = "LSPosed + Root integration") },\n                summary = { Text(text = "Experimental permission bridge and Root diagnostics") },\n                modifier = Modifier.animateItem(),\n            )\n        }\n\n        item(key = "version") {
+        item(key = "integration") {
+            Preference(
+                onClick = onIntegrationOpen,
+                shapes = BetterSegmentedShapes.top(),
+                title = { Text(text = "LSPosed + Root integration") },
+                summary = { Text(text = "Experimental permission bridge and Root diagnostics") },
+                modifier = Modifier.animateItem(),
+            )
+        }
+
+        item(key = "version") {
             Preference(
                 onClick = onSourceRepoOpen,
                 onLongClick = { onDebugModeChange(!isDebugMode) },
-                shapes = BetterSegmentedShapes.single(),
+                shapes = BetterSegmentedShapes.bottom(),
                 title = { Text(text = stringResource(R.string.pref_version_name)) },
                 summary = { Text(text = versionSummary(isDebugMode)) },
                 modifier = Modifier.animateItem(),
@@ -552,7 +566,8 @@ private fun PreviewSettingsScreen() {
                 onNotificationOpenDirChange = {},
                 onShowLauncherIconChange = {},
                 onDebugModeChange = {},
-                onIntegrationOpen = {},\n                onSourceRepoOpen = {},
+                onIntegrationOpen = {},
+                onSourceRepoOpen = {},
                 onForceDirectBootChange = {},
                 onMigrateDirectBoot = {},
                 onSaveLogs = {},

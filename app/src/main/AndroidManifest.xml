@@ -116,6 +116,10 @@
             android:exported="false" />
 
         <activity
+            android:name=".settings.IntegrationActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".settings.SettingsActivity"
             android:exported="false" />
 

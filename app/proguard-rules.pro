@@ -34,4 +34,6 @@
 -keep class com.chiller3.bcr.standalone.* {
     void main(java.lang.String[]);
 }
-\n# Entry point loaded by LSPosed via META-INF/xposed/java_init.list.\n-keep class com.chiller3.bcr.xposed.BcrModule { *; }\n
+
+# Entry point loaded via META-INF/xposed/java_init.list.
+-keep class com.chiller3.bcr.xposed.BcrModule { *; }
