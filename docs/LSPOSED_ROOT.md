@@ -29,3 +29,18 @@ Original systemless install and `zipDebug` packaging still work. Do not publish 
 AOSP permission service checks accept `checkPermission(package, permission, userId)`, `checkPermission(package, permission, device, userId)`, and `checkUidPermission(uid, permission[, device])`. In this branch the hook classifier recognizes these **ordered** signatures, rather than searching all arguments for matching values. It will not hook an unknown method shape. The UID path checks package ownership and fails closed on lookup errors. Unit tests cover the signature classifier.
 
 CI has `workflow_dispatch` for manual re-runs where GitHub Actions is enabled. Actions can be disabled for a fork; this is a repository setting outside the code changes.
+
+## BCR call lifecycle diagnostics
+
+The integration page stores **timestamps only** in BCR's device-protected preferences. No phone numbers, call details or audio are added to diagnostics. After a test call, press **Refresh permission and call status**.
+
+- No **InCallService created** timestamp: Android has probably not bound the BCR service; inspect Telecom eligibility, package visibility and module logs.
+- Service created, but **Call received by InCallService** is missing: the service has not observed the tested call.
+- Call observed, but **Recorder thread requested** is missing: inspect BCR's recording switch, runtime permissions and rules.
+- Recorder thread requested, but no usable output audio: inspect native AudioPolicy and the device's call capture support. This timestamp does **not** prove audio capture worked.
+
+If **Installation mode** says *System application*, the original ZIP or a different privileged placement can explain successful operation. Test the user-installed path separately only when you have a safe recovery option.
+
+### Native audio authorization
+
+On Android 16, `AudioServerPermissionProvider` synchronizes protected permission state to native audioserver. Java-only permission overrides are not a complete replacement for `CAPTURE_AUDIO_OUTPUT`, and Android documents voice-call capture as reserved for privileged preinstalled apps. If non-privileged APK testing fails despite Java permission checks, prefer a **minimal KernelSU privileged placement shim** over adding global SELinux exemptions or broadly patching audioserver. Such a shim would still require an initial boot-time integration and has not been implemented here.
