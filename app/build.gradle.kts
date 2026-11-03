@@ -209,7 +209,7 @@ dependencies {
     implementation(libs.material)
     implementation(libs.reorderable)
     debugImplementation(libs.androidx.compose.ui.tooling)
-    testImplementation(libs.junit)
+    // LSPosed API classes are provided by the framework, not bundled into BCR.\n    compileOnly("io.github.libxposed:api:102.0.0")\n    testImplementation(libs.junit)
 }
 
 val archive = tasks.register("archive") {
