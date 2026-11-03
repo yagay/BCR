@@ -1,5 +1,6 @@
 plugins {
-    alias(libs.plugins.android.library)
+    // Uses the AGP runtime already loaded by the root Android application plugin.
+    id("com.android.library")
 }
 
 android {
