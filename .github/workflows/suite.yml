@@ -25,7 +25,7 @@ jobs:
         run: |
           npm ci
           npm run build
-          npx cap copy android
+          npx cap sync android
       - name: Apply AGP compatibility fix to installed Capacitor 6 packages
         shell: bash
         run: |
@@ -41,9 +41,15 @@ jobs:
           cache: gradle
       - name: Assemble single combined APK
         run: ./gradlew --no-daemon --stacktrace --dependency-verification lenient -PsuiteEnabled=true :app:assembleDebug -x :app:archive
-      - name: Verify single APK output
+      - name: Verify both BCR and GUI are packaged
+        shell: bash
         run: |
-          test -n "$(find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' | head -1)"
+          apk="$(find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' | head -1)"
+          test -n "$apk"
+          for path in META-INF/xposed/module.prop META-INF/xposed/scope.list META-INF/xposed/java_init.list assets/public/index.html assets/capacitor.config.json assets/capacitor.plugins.json; do
+            unzip -Z1 "$apk" | grep -Fx "$path"
+          done
+          unzip -p "$apk" META-INF/xposed/scope.list | grep -Fx system
       - name: Upload BCR Suite Debug APK
         uses: actions/upload-artifact@v4
         with:

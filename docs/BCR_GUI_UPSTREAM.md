@@ -37,7 +37,7 @@ git submodule update --init
 cd external/bcr-gui
 npm ci
 npm run build
-npx cap copy android
+npx cap sync android
 cd ../..
 ./gradlew --dependency-verification lenient -PsuiteEnabled=true :app:assembleDebug -x :app:archive
 ```
@@ -73,3 +73,11 @@ scripts to replace AGP's removed `proguard-android.txt` option with
 `proguard-android-optimize.txt`. Neither upstream repository source nor
 submodule commit changes. This integration shim can be removed once the
 Capacitor dependency is upgraded or can build natively with AGP 9.
+
+## Capacitor plugin registration
+
+The Suite CI must use `npx cap sync android`, not merely `cap copy`,
+so that `assets/capacitor.plugins.json` is generated. The resulting APK
+is inspected for this file, the GUI web entry, and the original BCR
+LSPosed module resources. Without plugin registration the GUI's
+Capacitor-native features can fail even when the APK compiles.
