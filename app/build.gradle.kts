@@ -349,7 +349,7 @@ androidComponents.onVariants { variant ->
 
         archiveFileName.set("${rootProject.name}-${variantVersionName.get()}-${variant.name}.zip")
         // Force instantiation of old value or else this will cause infinite recursion
-        destinationDirectory.set(destinationDirectory.dir(variant.name).get())
+        destinationDirectory.set(layout.buildDirectory.dir("distributions/${variant.name}"))
 
         // Make the zip byte-for-byte reproducible (note that the APK is still not reproducible)
         isPreserveFileTimestamps = false
