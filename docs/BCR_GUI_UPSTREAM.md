@@ -103,3 +103,20 @@ inserting a BCR entry in GUI's side navigation and Settings page.
 There are no commits to `yagay/bcr-gui` or its original upstream.
 The overlay deliberately fails when the relevant GUI templates change
 so that upstream merges cannot silently remove the BCR entry.
+
+## Call-history GUI refactor (experimental)
+
+This BCR Suite experiment pins `yagay/bcr-gui` commit
+`cd13c0be18a8db1535f492b51aed56c0a8fdae57` from `feature/call-log-ui`, leaving the GUI
+fork's upstream-sync `dev` branch unchanged.
+
+The integrated GUI launches by default and now has a flat virtualized call
+recordings list, direction/source filters, a separate history sheet, and
+a compact player. GUI-originated BCR settings entries remain applied by
+the Suite navigation overlay at build time, independently of the refactor.
+The new GUI recognizes `VoIP/` recordings with `audio/wav` support.
+See `external/bcr-gui/docs/CALL_HISTORY_REFACTOR.md`.
+
+To update again after an upstream GUI merge, commit the tested GUI branch,
+update the Suite's git submodule pointer, run both independent GUI CI and
+Suite APK CI, then do device-level recordings/browser/SAF verification.

@@ -1,4 +1,4 @@
 [submodule "external/bcr-gui"]
 	path = external/bcr-gui
 	url = https://github.com/yagay/bcr-gui.git
-	branch = dev
+	branch = feature/call-log-ui
