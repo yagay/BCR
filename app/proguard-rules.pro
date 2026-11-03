@@ -37,3 +37,6 @@
 
 # Entry point loaded via META-INF/xposed/java_init.list.
 -keep class com.chiller3.bcr.xposed.BcrModule { *; }
+
+# Entry point called from KernelSU app_process rather than the normal Android launcher.
+-keep class com.chiller3.bcr.voip.VoipShellCapture { public static void main(java.lang.String[]); }

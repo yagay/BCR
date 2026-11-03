@@ -66,3 +66,45 @@ the LSPosed framework logs for rejection errors.
 
 CI now inspects all three files in the **built APK**, including `staticScope=false`
 and `scope.list=system`, rather than checking only the source tree.
+
+## Experimental independent VoIP capture
+
+The experimental build now contains an independent root-backed VoIP recording
+path, inspired by **JemRec** (Apache-2.0) and **ShizuCallRecorder** (GPL-3.0).
+These are references to the original projects, not a wholesale copy of their
+capture daemons.
+
+**Current capabilities and limitations:**
+- Opt-in package switches: WhatsApp, WhatsApp Business, Telegram, Telegram X,
+  Signal, Viber, Google Meet and WeChat; all OFF by default.
+- Manual start/stop of a stand-alone Android AudioPolicy capture session through
+  KernelSU `su` and `app_process`. No modification of third-party APKs.
+- On Android 14+, experimental best-effort automatic start from explicit ongoing
+  call-category notifications, enabled only after selecting apps and granting
+  notification-listener access. May not work on OEM devices due to background
+  execution limits; no content of notifications is retained.
+- Root path currently records **only VOIP PLAYBACK** (the possible remote party),
+  **not proven two-sided audio**. A microphone loop is deliberately disabled
+  because it may interrupt third-party voice calls. Real success is not assumed.
+- Results are placed in MediaStore at `Recordings/BCR-VoIP` as `.wav` when audio
+  capture finishes normally. No persistent root daemon and no auto-start at boot.
+- Normal BCR Telecom/VOICE_CALL recording remains unchanged. Do not run both
+  capture paths concurrently for the same call.
+
+**Test steps:**
+1. Open BCR Settings → VoIP recording (experimental).
+2. Check Audio Mode and Shell permission diagnostics; enable only one installed app.
+3. Press the corresponding manual test button while on a permitted call.
+4. Stop VoIP capture. Confirm a WAV file appears and contains meaningful audio.
+5. Only after manual capture works, enable notification access and automatic
+   detection. It requires a matching ongoing call notification and communication mode.
+6. If the Root AudioPolicy path fails on OxygenOS, inspect logcat tag `BCR/VoIPRoot`
+   and BCR's VoIP status. Do not grant global permissions or relax SELinux.
+
+**Upstream references:**
+- https://github.com/jemcik/JemRec
+- https://github.com/kitsumed/ShizuCallRecorder
+
+Note: Shell UID and Root UID have different Android permission and SELinux
+identities. This proof-of-concept uses Root and does not claim identical
+capabilities to ShizuCallRecorder/JemRec's Shell-UID daemons.

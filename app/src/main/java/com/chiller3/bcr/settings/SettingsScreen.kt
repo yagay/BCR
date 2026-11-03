@@ -54,6 +54,7 @@ import com.chiller3.bcr.ui.PreferenceGap
 import com.chiller3.bcr.ui.PreferencesChangedEffect
 import com.chiller3.bcr.ui.SwitchPreference
 import com.chiller3.bcr.ui.theme.AppTheme
+import com.chiller3.bcr.voip.VoipSettingsActivity
 
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
@@ -192,6 +193,9 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 prefs.isDebugMode = enabled
                 reloadPrefs++
             },
+            onVoipOpen = {
+                context.startActivity(Intent(context, VoipSettingsActivity::class.java))
+            },
             onIntegrationOpen = {
                 context.startActivity(Intent(context, IntegrationActivity::class.java))
             },
@@ -252,6 +256,7 @@ private fun SettingsContent(
     onShowLauncherIconChange: (Boolean) -> Unit,
     onDebugModeChange: (Boolean) -> Unit,
     onIntegrationOpen: () -> Unit,
+    onVoipOpen: () -> Unit,
     onSourceRepoOpen: () -> Unit,
     onForceDirectBootChange: (Boolean) -> Unit,
     onMigrateDirectBoot: () -> Unit,
@@ -392,6 +397,16 @@ private fun SettingsContent(
                 shapes = BetterSegmentedShapes.top(),
                 title = { Text(text = "LSPosed + Root integration") },
                 summary = { Text(text = "Experimental permission bridge and Root diagnostics") },
+                modifier = Modifier.animateItem(),
+            )
+        }
+
+        item(key = "voip") {
+            Preference(
+                onClick = onVoipOpen,
+                shapes = BetterSegmentedShapes.middle(),
+                title = { Text(text = "VoIP recording (experimental)") },
+                summary = { Text(text = "Selected apps, Root audio capture, notification detection") },
                 modifier = Modifier.animateItem(),
             )
         }
@@ -567,6 +582,7 @@ private fun PreviewSettingsScreen() {
                 onShowLauncherIconChange = {},
                 onDebugModeChange = {},
                 onIntegrationOpen = {},
+                onVoipOpen = {},
                 onSourceRepoOpen = {},
                 onForceDirectBootChange = {},
                 onMigrateDirectBoot = {},
