@@ -1,0 +1,45 @@
+name: BCR Suite combined debug
+on:
+  push:
+    branches:
+      - feature/bcr-gui-suite
+  workflow_dispatch:
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out BCR and BCR-GUI submodule
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: true
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: external/bcr-gui/package-lock.json
+      - name: Build unchanged BCR-GUI web bundle
+        working-directory: external/bcr-gui
+        run: |
+          npm ci
+          npm run build
+          npx cap copy android
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - name: Assemble single combined APK
+        run: ./gradlew --no-daemon --stacktrace --dependency-verification lenient -PsuiteEnabled=true :app:assembleDebug -x :app:archive
+      - name: Verify single APK output
+        run: |
+          test -n "$(find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' | head -1)"
+      - name: Upload BCR Suite Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: BCR-Suite-merged-debug
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
