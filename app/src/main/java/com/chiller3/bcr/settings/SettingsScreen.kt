@@ -196,6 +196,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             onVoipOpen = {
                 context.startActivity(Intent(context, VoipSettingsActivity::class.java))
             },
+            onGuiOpen = { context.startActivity(Intent().setClassName(context.packageName, "com.github.nicorac.bcrgui.MainActivity")) },
             onIntegrationOpen = {
                 context.startActivity(Intent(context, IntegrationActivity::class.java))
             },
@@ -256,6 +257,7 @@ private fun SettingsContent(
     onShowLauncherIconChange: (Boolean) -> Unit,
     onDebugModeChange: (Boolean) -> Unit,
     onIntegrationOpen: () -> Unit,
+    onGuiOpen: () -> Unit,
     onVoipOpen: () -> Unit,
     onSourceRepoOpen: () -> Unit,
     onForceDirectBootChange: (Boolean) -> Unit,
@@ -399,6 +401,18 @@ private fun SettingsContent(
                 summary = { Text(text = "Experimental permission bridge and Root diagnostics") },
                 modifier = Modifier.animateItem(),
             )
+        }
+
+        if (BuildConfig.BCR_GUI_ENABLED) {
+            item(key = "bcr_gui_library") {
+                Preference(
+                    onClick = onGuiOpen,
+                    shapes = BetterSegmentedShapes.middle(),
+                    title = { Text(text = "Recording library (BCR-GUI)") },
+                    summary = { Text(text = "Browse, search and play saved call recordings") },
+                    modifier = Modifier.animateItem(),
+                )
+            }
         }
 
         item(key = "voip") {
@@ -582,6 +596,7 @@ private fun PreviewSettingsScreen() {
                 onShowLauncherIconChange = {},
                 onDebugModeChange = {},
                 onIntegrationOpen = {},
+                onGuiOpen = {},
                 onVoipOpen = {},
                 onSourceRepoOpen = {},
                 onForceDirectBootChange = {},
