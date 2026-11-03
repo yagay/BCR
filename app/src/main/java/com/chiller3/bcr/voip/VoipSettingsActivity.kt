@@ -75,7 +75,7 @@ private fun VoipSettingsScreen(onBack: () -> Unit) {
         Text(
             "Separate Root AudioPolicy capture path based on JemRec and ShizuCallRecorder research. " +
                 "It currently records the VOIP PLAYBACK channel only, not verified two-sided audio. " +
-                "All capture is off by default. Test only with participants' permission.",
+                "The AudioPolicy mix may include other active communication audio. All capture is off by default. Test only with participants' permission.",
             style = MaterialTheme.typography.bodyMedium,
         )
         Text("Device diagnostics", style = MaterialTheme.typography.titleMedium)
@@ -153,7 +153,7 @@ private fun VoipSettingsScreen(onBack: () -> Unit) {
         Text(if (isRunning) "A recording attempt is running" else "No recording currently reported")
         Text(status)
         if (lastFile != null) Text("Last saved file: $lastFile")
-        Text("Successful files appear under Recordings/BCR-VoIP as WAV; absence or silence means capture failed.")
+        Text("Successful WAV files go to your BCR output folder/VoIP, or Recordings/BCR-VoIP as fallback.")
         OutlinedButton(onClick = { refresh++ }, modifier = Modifier.fillMaxWidth()) {
             Text("Refresh status")
         }

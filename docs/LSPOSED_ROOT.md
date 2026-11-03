@@ -86,8 +86,8 @@ capture daemons.
 - Root path currently records **only VOIP PLAYBACK** (the possible remote party),
   **not proven two-sided audio**. A microphone loop is deliberately disabled
   because it may interrupt third-party voice calls. Real success is not assumed.
-- Results are placed in MediaStore at `Recordings/BCR-VoIP` as `.wav` when audio
-  capture finishes normally. No persistent root daemon and no auto-start at boot.
+- Results are moved to BCR's configured output folder under `VoIP/` as `.wav`,
+  with MediaStore fallback in `Recordings/BCR-VoIP`. No persistent root daemon and no auto-start at boot.
 - Normal BCR Telecom/VOICE_CALL recording remains unchanged. Do not run both
   capture paths concurrently for the same call.
 
@@ -117,3 +117,15 @@ saved via MediaStore under `Recordings/BCR-VoIP`. The in-app status shows the
 actual destination. The recording process also stops if the BCR application
 process that launched it exits, or after the hard 2-hour limit. Audio capture
 continues to require explicit opt-in.
+
+### Notification timing and media mix
+
+Notification-based call detection retries AudioManager communication mode
+for up to 800 ms after an ongoing call notification arrives. This is
+best-effort; no content of notification messages is read and apps without
+Android `CATEGORY_CALL` notifications must be started manually.
+
+AudioPolicy captures a system voice-communication playback mix, not a
+cryptographically authenticated stream identified by the selected package.
+Only enable recording for a call you are taking part in; do not assume
+other active voice sessions cannot be included in a recording.
