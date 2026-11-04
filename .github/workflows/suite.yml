@@ -4,6 +4,12 @@ on:
     branches:
       - feature/bcr-gui-suite
   workflow_dispatch:
+
+# Only the newest Suite Debug push should build; superseded pushes are cancelled.
+concurrency:
+  group: bcr-suite-debug-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   suite:
     runs-on: ubuntu-latest
@@ -45,7 +51,7 @@ jobs:
           java-version: '21'
           cache: gradle
       - name: Assemble and test combined Debug APK
-        run: ./gradlew --no-daemon --stacktrace --dependency-verification lenient :app:assembleDebug :app:testDebugUnitTest -x :app:archive
+        run: ./gradlew -PsuiteEnabled=true --no-daemon --stacktrace --dependency-verification lenient :app:assembleDebug :app:testDebugUnitTest -x :app:archive
       - name: Verify both BCR and GUI are packaged
         shell: bash
         run: |
