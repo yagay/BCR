@@ -8,6 +8,9 @@ on:
 jobs:
   build:
     name: Build project
+    # feature/bcr-gui-suite is already built and tested by suite.yml.
+    # Never launch a second, standalone core Debug APK for that PR/branch.
+    if: ${{ !(github.event_name == 'pull_request' && github.head_ref == 'feature/bcr-gui-suite') && !(github.event_name == 'workflow_dispatch' && github.ref_name == 'feature/bcr-gui-suite') }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
