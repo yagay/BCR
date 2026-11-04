@@ -40,13 +40,14 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: gradle
-      - name: Assemble single combined APK
-        run: ./gradlew --no-daemon --stacktrace --dependency-verification lenient -PsuiteEnabled=true :app:assembleDebug -x :app:archive
+      - name: Assemble single combined Debug APK
+        run: ./gradlew --no-daemon --stacktrace --dependency-verification lenient :app:assembleDebug -x :app:archive
       - name: Verify both BCR and GUI are packaged
         shell: bash
         run: |
-          apk="$(find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' | head -1)"
-          test -n "$apk"
+          mapfile -t apks < <(find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -type f)
+          test "${#apks[@]}" -eq 1 || { echo 'Expected exactly one combined Debug APK' >&2; exit 1; }
+          apk="${apks[0]}"
           for path in META-INF/xposed/module.prop META-INF/xposed/scope.list META-INF/xposed/java_init.list assets/public/index.html assets/capacitor.config.json assets/capacitor.plugins.json; do
             unzip -Z1 "$apk" | grep -Fx "$path"
           done
