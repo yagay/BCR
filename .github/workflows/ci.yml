@@ -32,9 +32,10 @@ jobs:
           test -s app/src/main/resources/META-INF/xposed/module.prop
           test -s app/src/main/resources/META-INF/xposed/scope.list
 
-      - name: Build and test
-        # Debug build only since release builds require a signing key
-        run: ./gradlew --no-daemon --stacktrace :app:assembleDebug :app:testDebugUnitTest -x :app:archive
+      - name: Build and test BCR core (Suite is covered by suite.yml)
+        # This generic PR check must not require GUI node_modules or copied
+        # Capacitor assets. The dedicated Suite workflow builds both together.
+        run: ./gradlew -PsuiteEnabled=false --no-daemon --stacktrace :app:assembleDebug :app:testDebugUnitTest -x :app:archive
 
       - name: Print libxposed dependency SHA-512 for strict pinning
         if: always()
