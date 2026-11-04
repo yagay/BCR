@@ -103,4 +103,44 @@ replace(
 
   async save() {"""
 )
-print("Suite navigation overlay applied (ephemeral build worktree).")
+# Isolate the Suite index from the standalone GUI. Both apps may point at the
+# exact same recording folder, but they must not rewrite each other's database.
+replace(
+    "src/app/models/dbContent.ts",
+    "export const DB_FILENAME = '.bcr-gui-database.json';",
+    "export const DB_FILENAME = '.bcr-suite-database.json';"
+)
+
+# A stale shared index could mask existing recordings because the folder mtime
+# is not reliable on all SAF providers. Resolve the Suite's own DB URI and run
+# a complete scan at process startup, regardless of the cached lastUpdate.
+# The scan preserves any valid cached entries if an individual subfolder fails.
+replace(
+    "src/app/services/recordings.service.ts",
+    """    // load existing database from storage
+    if (!this.initialized) {
+      if (!await this.load() || await this.shallRefresh()) {
+        await this.refreshContent();
+      }
+      this.initialized = true;
+    }""",
+    """    // BCR-SUITE-NAV-OVERLAY: use the Suite-only index and always reconcile
+    // it with the real files on the first launch of this process.
+    if (!this.initialized) {
+      await this.updateDbFileUri();
+      await this.load();
+      await this.refreshContent();
+      this.initialized = true;
+    }"""
+)
+
+# Avoid racing directory selection persistence against the first rescan.
+replace(
+    "src/app/services/recordings.service.ts",
+    """          this.updateDbFileUri()
+          await this.settings.save();""",
+    """          await this.updateDbFileUri();
+          await this.settings.save();"""
+)
+
+print("Suite navigation and history-index overlay applied (ephemeral build worktree).")
