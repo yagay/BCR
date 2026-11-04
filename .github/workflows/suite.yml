@@ -25,6 +25,10 @@ jobs:
         run: |
           npm ci
           python3 ../../integrations/bcrgui-bridge/apply_navigation_overlay.py
+          # Verify Suite-only DB isolation and mandatory initial rescan are present.
+          grep -Fq ".bcr-suite-database.json" src/app/models/dbContent.ts
+          grep -Fq "await this.updateDbFileUri();" src/app/services/recordings.service.ts
+          grep -Fq "await this.refreshContent();" src/app/services/recordings.service.ts
           npm run build
           npx cap sync android
       - name: Apply AGP compatibility fix to installed Capacitor 6 packages
