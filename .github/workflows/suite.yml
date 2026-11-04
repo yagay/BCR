@@ -40,8 +40,8 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: gradle
-      - name: Assemble single combined Debug APK
-        run: ./gradlew --no-daemon --stacktrace --dependency-verification lenient :app:assembleDebug -x :app:archive
+      - name: Assemble and test combined Debug APK
+        run: ./gradlew --no-daemon --stacktrace --dependency-verification lenient :app:assembleDebug :app:testDebugUnitTest -x :app:archive
       - name: Verify both BCR and GUI are packaged
         shell: bash
         run: |
