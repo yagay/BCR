@@ -8,6 +8,7 @@ package com.chiller3.bcr.manager
 
 import android.content.Context
 import android.net.Uri
+import android.media.MediaMetadataRetriever
 import androidx.documentfile.provider.DocumentFile
 import com.chiller3.bcr.Preferences
 import com.chiller3.bcr.extension.toDocumentFile
@@ -118,6 +119,21 @@ internal class RecordingRepository(private val context: Context) {
                     ?.optLong("duration_secs_encoded") ?: 0,
             )
         }.sortedByDescending { it.timestamp }
+    }
+
+    /** Read missing durations on demand, never during the initial directory scan. */
+    fun readDuration(file: ManagedRecording): Long {
+        val retriever = MediaMetadataRetriever()
+        return try {
+            retriever.setDataSource(context, file.uri)
+            val millis = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                ?.toLongOrNull() ?: 0L
+            (millis / 1000L).coerceAtLeast(0L)
+        } catch (_: Exception) {
+            0L
+        } finally {
+            runCatching { retriever.release() }
+        }
     }
 
     fun delete(items: List<ManagedRecording>): Int {
