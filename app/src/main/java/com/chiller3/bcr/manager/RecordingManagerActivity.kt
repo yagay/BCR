@@ -186,6 +186,7 @@ private fun ManagerScreen(onSettings: () -> Unit) {
         (direction == "all" || r.direction == direction ||
             (direction == "other" && r.direction !in setOf("in", "out"))) &&
             (r.title.contains(query, true) || r.number.contains(query, true) ||
+                r.participantNumbers.any { it.contains(query, true) } ||
                 r.file.name.orEmpty().contains(query, true))
     }
     val groups = filtered.groupBy { recordingGroupKey(it, contactAliases) }
@@ -366,9 +367,13 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                             )
                         }
                         if (expanded == groupKey) {
-                            val phoneNumbers = group.mapNotNull { file ->
-                                dialablePhoneNumber(file.number)?.let { number ->
-                                    (file.normalizedNumber.ifBlank { number }).filter(Char::isDigit) to number
+                            val phoneNumbers = group.flatMap { file ->
+                                val participants = file.participantNumbers.ifEmpty { listOf(file.number) }
+                                participants.mapNotNull { number ->
+                                    dialablePhoneNumber(number)?.let { valid ->
+                                        (if (number == file.number) file.normalizedNumber.ifBlank { valid }
+                                         else valid).filter(Char::isDigit) to valid
+                                    }
                                 }
                             }.distinctBy { it.first }.map { it.second }
                             item(key = "contact-details:$groupKey") {
