@@ -16,6 +16,7 @@ internal class RecordingTemplateFallback(templates: List<Template>) {
     private data class Pattern(
         val regex: Regex,
         val variableNames: List<String>,
+        val variableArguments: List<String?>,
         val score: Int,
     )
 
@@ -37,7 +38,8 @@ internal class RecordingTemplateFallback(templates: List<Template>) {
             val source = fragments.joinToString("")
             val compiled = runCatching { Regex("^$source$", RegexOption.IGNORE_CASE) }.getOrNull()
                 ?: return@mapNotNull null
-            Pattern(compiled, names, names.size * 100 + parts.sumOf { it.literal?.length ?: 0 })
+            Pattern(compiled, names, parts.filter { it.variable != null }.map { it.argument },
+                names.size * 100 + parts.sumOf { it.literal?.length ?: 0 })
         }
     }.sortedByDescending { it.score }
 
@@ -51,6 +53,22 @@ internal class RecordingTemplateFallback(templates: List<Template>) {
             }.toMap()
         }
         return emptyMap()
+    }
+
+    /** BCR also supports date:unix_s and date:unix_ms templates. */
+    fun unixTimestampMillis(relativePath: String): Long? {
+        for (pattern in patterns) {
+            val index = pattern.variableNames.indexOf("date")
+            if (index < 0) continue
+            val argument = pattern.variableArguments[index]
+            if (argument != "unix_s" && argument != "unix_ms") continue
+            val match = pattern.regex.matchEntire(relativePath) ?: continue
+            val raw = match.groupValues[index + 1].toLongOrNull() ?: continue
+            return if (argument == "unix_s") {
+                runCatching { Math.multiplyExact(raw, 1000L) }.getOrNull()
+            } else raw
+        }
+        return null
     }
 
     private fun expand(template: Template.TemplateString): List<List<Part>> {
