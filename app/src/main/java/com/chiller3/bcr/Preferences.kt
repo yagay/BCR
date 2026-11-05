@@ -46,6 +46,7 @@ class Preferences(initialContext: Context) {
         private const val PREF_FORMAT_PARAM_PREFIX = "codec_param_"
         private const val PREF_FORMAT_SAMPLE_RATE_PREFIX = "codec_sample_rate_"
         private const val PREF_FORMAT_AUDIO_SOURCE = "audio_source"
+        private const val PREF_RECORDING_GAIN_DB = "recording_gain_db"
         private const val PREF_MIN_DURATION = "min_duration"
         private const val PREF_WRITE_METADATA = "write_metadata"
         private const val PREF_RECORD_TELECOM_APPS = "record_telecom_apps"
@@ -81,6 +82,7 @@ class Preferences(initialContext: Context) {
                     || key.startsWith(PREF_FORMAT_SAMPLE_RATE_PREFIX)
                     || key == PREF_FORMAT_STEREO
                     || key == PREF_FORMAT_AUDIO_SOURCE
+                    || key == PREF_RECORDING_GAIN_DB
     }
 
     private val context = if (initialContext.isDeviceProtectedStorage) {
@@ -376,6 +378,16 @@ class Preferences(initialContext: Context) {
             } else {
                 putString(PREF_FORMAT_AUDIO_SOURCE, source.name)
             }
+        }
+
+    /** Optional digital gain for newly recorded BCR phone calls (dB). Off by default. */
+    var recordingGainDb: Int
+        get() = prefs.getInt(PREF_RECORDING_GAIN_DB, 0).let {
+            if (it in setOf(0, 3, 6, 9)) it else 0
+        }
+        set(db) {
+            require(db in setOf(0, 3, 6, 9))
+            prefs.edit { putInt(PREF_RECORDING_GAIN_DB, db) }
         }
 
     /** Remove the default format preference and the parameters for all formats. */

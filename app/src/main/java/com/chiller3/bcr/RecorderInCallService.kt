@@ -123,6 +123,7 @@ class RecorderInCallService : InCallService(), RecorderThread.OnRecordingComplet
 
     override fun onCreate() {
         super.onCreate()
+        IntegrationStatus.mark(this, IntegrationStatus.Event.SERVICE_CREATED)
 
         notificationManager = getSystemService(NotificationManager::class.java)
         prefs = Preferences(this)
@@ -173,6 +174,7 @@ class RecorderInCallService : InCallService(), RecorderThread.OnRecordingComplet
      */
     override fun onCallAdded(call: Call) {
         super.onCallAdded(call)
+        IntegrationStatus.mark(this, IntegrationStatus.Event.CALL_ADDED)
         Log.d(TAG, "onCallAdded: $call")
 
         // The callback is unregistered in requestStopRecording()
@@ -194,6 +196,7 @@ class RecorderInCallService : InCallService(), RecorderThread.OnRecordingComplet
      */
     override fun onCallRemoved(call: Call) {
         super.onCallRemoved(call)
+        IntegrationStatus.mark(this, IntegrationStatus.Event.CALL_REMOVED)
         Log.d(TAG, "onCallRemoved: $call")
 
         // Unconditionally request the recording to stop, even if it's not in a disconnecting state
@@ -267,6 +270,7 @@ class RecorderInCallService : InCallService(), RecorderThread.OnRecordingComplet
 
             updateForegroundState()
             recorder.start()
+            IntegrationStatus.mark(this, IntegrationStatus.Event.RECORD_THREAD_STARTED)
         }
     }
 

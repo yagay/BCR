@@ -2,11 +2,14 @@ on:
   push:
     branches:
       - master
+      - feature/lsposed-root
   pull_request:
+  workflow_dispatch:
 jobs:
   build:
     name: Build project
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -23,6 +26,40 @@ jobs:
           java-version: 21
           cache: gradle
 
+      - name: Verify LSPosed module resources
+        run: |
+          test -s app/src/main/resources/META-INF/xposed/java_init.list
+          test -s app/src/main/resources/META-INF/xposed/module.prop
+          test -s app/src/main/resources/META-INF/xposed/scope.list
+
       - name: Build and test
         # Debug build only since release builds require a signing key
-        run: ./gradlew --no-daemon build zipDebug -x assembleRelease
+        run: ./gradlew --no-daemon --stacktrace :app:assembleDebug :app:testDebugUnitTest -x :app:archive
+
+      - name: Print libxposed dependency SHA-512 for strict pinning
+        if: always()
+        shell: bash
+        run: |
+          cache="$HOME/.gradle/caches/modules-2/files-2.1/io.github.libxposed/api/102.0.0"
+          if [ -d "$cache" ]; then
+            find "$cache" -type f -name "*.aar" -exec sha512sum {} +
+            find "$cache" -type f -name "*.module" -exec sha512sum {} +
+          fi
+
+      - name: Verify LSPosed metadata inside Debug APK
+        shell: bash
+        run: |
+          apk="$(find app/build/outputs/apk/debug -maxdepth 1 -name "*.apk" -type f | head -n 1)"
+          test -n "$apk"
+          for path in module.prop java_init.list scope.list; do
+            unzip -Z1 "$apk" | grep -Fx "META-INF/xposed/$path"
+          done
+          unzip -p "$apk" META-INF/xposed/module.prop | grep -Fx "staticScope=false"
+          unzip -p "$apk" META-INF/xposed/scope.list | grep -Fx "system"
+          unzip -p "$apk" META-INF/xposed/java_init.list | grep -Fx "com.chiller3.bcr.xposed.BcrModule"
+      - name: Upload LSPosed Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: BCR-native-lsposed-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error

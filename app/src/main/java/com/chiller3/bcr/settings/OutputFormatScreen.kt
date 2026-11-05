@@ -7,7 +7,10 @@ package com.chiller3.bcr.settings
 
 import android.content.res.Configuration
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -40,6 +43,7 @@ fun OutputFormatScreen(onBack: () -> Unit) {
 
     var reloadPrefs by remember { mutableIntStateOf(0) }
     val savedFormat = remember(reloadPrefs) { Format.fromPreferences(prefs) }
+    val recordingGainDb = remember(reloadPrefs) { prefs.recordingGainDb }
 
     AppScreen(
         title = { Text(text = stringResource(R.string.pref_output_format_name)) },
@@ -54,6 +58,7 @@ fun OutputFormatScreen(onBack: () -> Unit) {
             formatParam = savedFormat.param ?: savedFormat.format.paramInfo.default,
             sampleRate = savedFormat.sampleRate ?: savedFormat.format.sampleRateInfo.default,
             audioSource = savedFormat.audioSource,
+            gainDb = recordingGainDb,
             onFormatChange = { newFormat ->
                 prefs.format = newFormat
                 reloadPrefs++
@@ -86,6 +91,14 @@ fun OutputFormatScreen(onBack: () -> Unit) {
                 prefs.audioSource = null
                 reloadPrefs++
             },
+            onGainChange = { value ->
+                prefs.recordingGainDb = value
+                reloadPrefs++
+            },
+            onGainReset = {
+                prefs.recordingGainDb = 0
+                reloadPrefs++
+            },
             contentPadding = params.contentPadding,
         )
     }
@@ -97,6 +110,7 @@ private fun OutputFormatContent(
     formatParam: UInt,
     sampleRate: UInt,
     audioSource: AudioSource,
+    gainDb: Int,
     onFormatChange: (Format) -> Unit,
     onFormatReset: () -> Unit,
     onFormatParamChange: (UInt) -> Unit,
@@ -105,6 +119,8 @@ private fun OutputFormatContent(
     onSampleRateReset: () -> Unit,
     onAudioSourceChange: (AudioSource) -> Unit,
     onAudioSourceReset: () -> Unit,
+    onGainChange: (Int) -> Unit,
+    onGainReset: () -> Unit,
     contentPadding: PaddingValues = PaddingValues(),
 ) {
     val formatParamTitle = formatParamTitle(format)
@@ -112,6 +128,7 @@ private fun OutputFormatContent(
     var showFormatChoiceDialog by rememberSaveable { mutableStateOf<FormatChoiceAction?>(null) }
     var showFormatParamDialog by rememberSaveable { mutableStateOf(false) }
     var showSampleRateDialog by rememberSaveable { mutableStateOf(false) }
+    var showGainDialog by rememberSaveable { mutableStateOf(false) }
 
     PreferenceColumn(contentPadding = contentPadding) {
         item(key = "output_format") {
@@ -153,12 +170,45 @@ private fun OutputFormatContent(
             Preference(
                 onClick = { showFormatChoiceDialog = FormatChoiceAction.SelectAudioSource(format) },
                 onLongClick = onAudioSourceReset,
-                shapes = BetterSegmentedShapes.bottom(),
+                shapes = BetterSegmentedShapes.middle(),
                 title = { Text(text = stringResource(R.string.pref_audio_source_name)) },
                 summary = { Text(text = audioSourceSummary(audioSource)) },
                 modifier = Modifier.animateItem(),
             )
         }
+        item(key = "recording_gain") {
+            Preference(
+                onClick = { showGainDialog = true },
+                onLongClick = onGainReset,
+                shapes = BetterSegmentedShapes.bottom(),
+                title = { Text(text = stringResource(R.string.pref_recording_gain_name)) },
+                summary = { Text(text = if (gainDb == 0) "Off (original audio)" else "+$gainDb dB · soft limiter") },
+                modifier = Modifier.animateItem(),
+            )
+        }
+    }
+
+    if (showGainDialog) {
+        AlertDialog(
+            onDismissRequest = { showGainDialog = false },
+            title = { Text(stringResource(R.string.pref_recording_gain_name)) },
+            text = {
+                Column {
+                    Text(stringResource(R.string.pref_recording_gain_desc))
+                    for (gain in listOf(0, 3, 6, 9)) {
+                        TextButton(onClick = {
+                            onGainChange(gain)
+                            showGainDialog = false
+                        }) {
+                            Text(if (gain == 0) "Off (original audio)" else "+$gain dB")
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showGainDialog = false }) { Text("Close") }
+            },
+        )
     }
 
     showFormatChoiceDialog?.let { action ->
@@ -275,6 +325,7 @@ private fun PreviewOutputFormatScreen() {
                 formatParam = format.paramInfo.default,
                 sampleRate = format.sampleRateInfo.default,
                 audioSource = AudioSource.VOICE_UPLINK_DOWNLINK,
+                gainDb = 0,
                 onFormatChange = {},
                 onFormatReset = {},
                 onFormatParamChange = {},
@@ -283,6 +334,8 @@ private fun PreviewOutputFormatScreen() {
                 onSampleRateReset = {},
                 onAudioSourceChange = {},
                 onAudioSourceReset = {},
+                onGainChange = {},
+                onGainReset = {},
                 contentPadding = params.contentPadding,
             )
         }
