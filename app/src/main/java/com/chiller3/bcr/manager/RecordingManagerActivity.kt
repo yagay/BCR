@@ -83,6 +83,7 @@ private fun ManagerScreen(onSettings: () -> Unit) {
     var searchVisible by remember { mutableStateOf(false) }
     var direction by remember { mutableStateOf("all") }
     var expanded by remember { mutableStateOf<String?>(null) }
+    var showAllExpanded by remember { mutableStateOf(false) }
     val historyListState = rememberLazyListState()
     var active by remember { mutableStateOf<ManagedRecording?>(null) }
     val selected = remember { mutableStateListOf<String>() }
@@ -273,6 +274,7 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                                         historyListState.requestScrollToItem(headerIndex(groupKey))
                                         active = null
                                         expanded = if (expanded == groupKey) null else groupKey
+                                        showAllExpanded = false
                                     } else {
                                         group.forEach { file ->
                                             val id = file.uri.toString()
@@ -284,6 +286,7 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                                     historyListState.requestScrollToItem(headerIndex(groupKey))
                                     active = null
                                     expanded = groupKey
+                                    showAllExpanded = false
                                     group.forEach { file ->
                                         val id = file.uri.toString()
                                         if (id !in selected) selected.add(id)
@@ -310,7 +313,8 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                                     },
                                 )
                             }
-                            items(group, key = { file -> "recording:${file.uri}" }) { file ->
+                            items(if (showAllExpanded) group else group.take(4),
+                                key = { file -> "recording:${file.uri}" }) { file ->
                                 val id = file.uri.toString()
                                 Column(Modifier.fillMaxWidth().animateContentSize()) {
                                     RecordingHistoryRow(
@@ -356,6 +360,24 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                                             )
                                         }
                                     }
+                                }
+                            }
+                        }
+                        if (expanded == groupKey && group.size > 4) {
+                            item(key = "more:$groupKey") {
+                                TextButton(
+                                    onClick = {
+                                        if (showAllExpanded) {
+                                            // Anchoring prevents a very long group disappearing
+                                            // above the viewport as its extra rows are removed.
+                                            historyListState.requestScrollToItem(headerIndex(groupKey))
+                                        }
+                                        showAllExpanded = !showAllExpanded
+                                    },
+                                    modifier = Modifier.fillMaxWidth().padding(start = 64.dp, end = 12.dp),
+                                ) {
+                                    Text(if (showAllExpanded) "Show fewer recordings"
+                                        else "Show ${group.size - 4} more recordings")
                                 }
                             }
                         }
