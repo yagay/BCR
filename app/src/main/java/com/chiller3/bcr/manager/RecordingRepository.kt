@@ -44,6 +44,7 @@ internal data class ManagedRecording(
     val sizeBytes: Long = -1L,
     val format: String = "",
     val codec: String = "",
+    val mimeType: String = "",
     val sampleRate: Int = 0,
     val channels: Int = 0,
     val participantNumbers: List<String> = emptyList(),
@@ -274,6 +275,8 @@ internal class RecordingRepository(private val context: Context) {
                     ?: name.substringAfterLast('.', "").uppercase(Locale.ROOT)
                         .ifBlank { file.type.orEmpty() },
                 codec = clean(formatJson?.optString("mime_type_audio")).orEmpty(),
+                mimeType = clean(formatJson?.optString("mime_type_container"))
+                    ?: file.type ?: "audio/*",
                 sampleRate = recordingJson?.optInt("sample_rate", 0) ?: 0,
                 channels = recordingJson?.optInt("channel_count", 0) ?: 0,
                 participantNumbers = participants,
