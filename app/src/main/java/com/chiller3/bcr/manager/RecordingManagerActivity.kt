@@ -8,6 +8,9 @@ import android.content.ClipData
 import android.content.Intent
 import android.media.MediaPlayer
 import android.os.Bundle
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -207,64 +210,64 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                 error != null -> Text("Unable to scan recordings: $error", Modifier.padding(16.dp))
                 groups.isEmpty() -> Text("No recordings found", Modifier.padding(16.dp))
                 else -> LazyColumn(Modifier.weight(1f)) {
-                    items(groups, key = { it.first().uri.toString() }) { group ->
+                    val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                    var previousDay: String? = null
+                    groups.forEach { group ->
                         val first = group.first()
+                        val day = dateFormat.format(Date(first.timestamp))
+                        if (day != previousDay) {
+                            item(key = "day:$day") { HistoryDateHeader(day) }
+                            previousDay = day
+                        }
                         val groupKey = recordingGroupKey(first)
-                        val open = expanded == groupKey
-                        Row(
-                            Modifier.fillMaxWidth().combinedClickable(
-                                onClick = { expanded = if (open) null else groupKey },
-                                onLongClick = {
-                                    expanded = groupKey
-                                    // Select this contact's recordings together.
-                                    group.forEach { file ->
-                                        val key = file.uri.toString()
-                                        if (key !in selected) selected.add(key)
+                        item(key = "group:$groupKey") {
+                            CallHistoryRow(
+                                title = first.title,
+                                detail = "${directionLabel(first.direction)} · ${first.dateLabel}",
+                                count = group.size,
+                                expanded = expanded == groupKey,
+                                onClick = {
+                                    if (selected.isEmpty()) {
+                                        expanded = if (expanded == groupKey) null else groupKey
+                                    } else {
+                                        group.forEach { file ->
+                                            val id = file.uri.toString()
+                                            if (id in selected) selected.remove(id) else selected.add(id)
+                                        }
                                     }
                                 },
-                            ).padding(16.dp),
-                        ) {
-                            Column(Modifier.weight(1f)) {
-                                Text(first.title, style = MaterialTheme.typography.titleMedium)
-                                Text(
-                                    "${group.size} recording(s) · ${first.direction.ifBlank { "Call" }} · ${first.dateLabel}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                )
-                            }
-                            Text(if (open) "⌃" else "⌄")
-                        }
-                        if (open) group.forEach { file ->
-                            val key = file.uri.toString()
-                            Row(
-                                Modifier.fillMaxWidth().combinedClickable(
-                                    onClick = {
-                                        if (selected.isNotEmpty()) {
-                                            if (key in selected) selected.remove(key) else selected.add(key)
-                                        } else active = file
-                                    },
-                                    onLongClick = { if (key !in selected) selected.add(key) },
-                                ).padding(start = 24.dp, end = 12.dp, top = 8.dp, bottom = 8.dp),
-                            ) {
-                                if (selected.isNotEmpty()) Checkbox(
-                                    checked = key in selected,
-                                    onCheckedChange = {
-                                        if (it && key !in selected) selected.add(key)
-                                        else if (!it) selected.remove(key)
-                                    },
-                                )
-                                Column(Modifier.weight(1f)) {
-                                    Text(file.dateLabel)
-                                    Text(
-                                        "${file.direction.ifBlank { "Call" }} · ${file.durationSeconds}s",
-                                        style = MaterialTheme.typography.bodySmall,
+                                onLongClick = {
+                                    expanded = groupKey
+                                    group.forEach { file ->
+                                        val id = file.uri.toString()
+                                        if (id !in selected) selected.add(id)
+                                    }
+                                },
+                            )
+                            if (expanded == groupKey) {
+                                group.forEach { file ->
+                                    val id = file.uri.toString()
+                                    RecordingHistoryRow(
+                                        recording = file,
+                                        checked = if (selected.isEmpty()) null else id in selected,
+                                        onClick = {
+                                            if (selected.isNotEmpty()) {
+                                                if (id in selected) selected.remove(id)
+                                                else selected.add(id)
+                                            } else active = file
+                                        },
+                                        onLongClick = {
+                                            if (id !in selected) selected.add(id)
+                                        },
+                                        onPlay = { active = file },
                                     )
                                 }
-                                if (selected.isEmpty()) {
-                                    TextButton(onClick = { active = file }) { Text("Play") }
-                                }
                             }
+                            HorizontalDivider(
+                                modifier = Modifier.padding(start = 68.dp),
+                                color = MaterialTheme.colorScheme.outlineVariant,
+                            )
                         }
-                        HorizontalDivider()
                     }
                 }
             }
