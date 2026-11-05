@@ -25,4 +25,4 @@ jobs:
 
       - name: Build and test
         # Debug build only since release builds require a signing key
-        run: ./gradlew --no-daemon build zipDebug -x assembleRelease
+        run: ./gradlew --no-daemon assembleDebug zipDebug
