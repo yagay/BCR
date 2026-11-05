@@ -95,7 +95,9 @@ internal class RecordingPlaybackController(private val context: Context) {
     fun setSpeed(value: Float) {
         speed = value
         val mp = mediaPlayer ?: return
-        if (ready) runCatching {
+        // Android may implicitly resume when setPlaybackParams() is invoked on
+        // a paused MediaPlayer. Store speed only; apply it when playback starts.
+        if (ready && playing) runCatching {
             mp.playbackParams = PlaybackParams().setSpeed(value)
         }.onFailure { error = it.localizedMessage ?: "Cannot change playback speed" }
     }
