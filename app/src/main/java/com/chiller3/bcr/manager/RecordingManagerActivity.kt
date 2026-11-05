@@ -88,6 +88,7 @@ private fun recordingGroupKey(file: ManagedRecording): String {
 private fun ManagerScreen(onSettings: () -> Unit) {
     val context = LocalContext.current
     val repository = remember { RecordingRepository(context.applicationContext) }
+    val contacts = remember { ContactDirectory(context.applicationContext) }
     val playback = remember { RecordingPlaybackController(context.applicationContext) }
     val scope = rememberCoroutineScope()
     var recordings by remember { mutableStateOf<List<ManagedRecording>>(emptyList()) }
@@ -284,8 +285,19 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                         }
                         val groupKey = recordingGroupKey(first)
                         item(key = "group:$groupKey") {
+                            val contactNumber = group.firstOrNull {
+                                dialablePhoneNumber(it.number) != null
+                            }?.number.orEmpty()
+                            val profile by produceState<ContactProfile?>(
+                                initialValue = null, key1 = contactNumber,
+                            ) {
+                                value = withContext(Dispatchers.IO) {
+                                    contacts.lookup(contactNumber)
+                                }
+                            }
                             CallHistoryRow(
                                 title = first.title,
+                                profile = profile,
                                 detail = DateFormat.getTimeInstance(DateFormat.SHORT)
                                     .format(Date(first.timestamp)) + " · ${group.size} recording" +
                                     if (group.size == 1) "" else "s",
@@ -341,6 +353,7 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                             items(if (showAllExpanded) group else group.take(4),
                                 key = { file -> "recording:${file.uri}" }) { file ->
                                 val id = file.uri.toString()
+                                var detailsVisible by remember(file.uri) { mutableStateOf(false) }
                                 Column(Modifier.fillMaxWidth().animateContentSize()) {
                                     RecordingHistoryRow(
                                         recording = file,
@@ -360,7 +373,11 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                                         onPlay = {
                                             active = if (active?.uri == file.uri) null else file
                                         },
+                                        onDetails = { detailsVisible = !detailsVisible },
                                     )
+                                    if (detailsVisible) {
+                                        RecordingFileDetails(file)
+                                    }
                                     if (selected.isEmpty() && active?.uri == file.uri) {
                                         key(file.uri) {
                                             RecordingPlayer(
