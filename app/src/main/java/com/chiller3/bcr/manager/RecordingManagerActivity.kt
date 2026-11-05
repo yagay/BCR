@@ -17,7 +17,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -28,10 +33,20 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.graphics.Color
+import kotlin.math.roundToInt
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -214,7 +229,7 @@ private fun ManagerScreen(onSettings: () -> Unit) {
             }
             Row(
                 modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 12.dp),
+                    .padding(horizontal = 12.dp, vertical = 0.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 listOf("all" to "All", "in" to "Incoming", "out" to "Outgoing", "other" to "Other")
@@ -222,7 +237,8 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                         FilterChip(
                             selected = direction == value,
                             onClick = { direction = value },
-                            label = { Text(label) },
+                            label = { Text(label, style = MaterialTheme.typography.labelMedium) },
+                            shape = RoundedCornerShape(50),
                         )
                     }
             }
@@ -261,8 +277,9 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                         item(key = "group:$groupKey") {
                             CallHistoryRow(
                                 title = first.title,
-                                detail = "${directionLabel(first.direction)} · " +
-                                    DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(first.timestamp)),
+                                detail = DateFormat.getTimeInstance(DateFormat.SHORT)
+                                    .format(Date(first.timestamp)) + " · ${group.size} recording" +
+                                    if (group.size == 1) "" else "s",
                                 count = group.size,
                                 expanded = expanded == groupKey,
                                 onClick = {
@@ -365,19 +382,31 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                         }
                         if (expanded == groupKey && group.size > 4) {
                             item(key = "more:$groupKey") {
-                                TextButton(
-                                    onClick = {
-                                        if (showAllExpanded) {
-                                            // Anchoring prevents a very long group disappearing
-                                            // above the viewport as its extra rows are removed.
-                                            historyListState.requestScrollToItem(headerIndex(groupKey))
-                                        }
-                                        showAllExpanded = !showAllExpanded
-                                    },
-                                    modifier = Modifier.fillMaxWidth().padding(start = 64.dp, end = 12.dp),
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(start = 68.dp, end = 16.dp),
+                                    horizontalArrangement = Arrangement.Start,
                                 ) {
-                                    Text(if (showAllExpanded) "Show fewer recordings"
-                                        else "Show ${group.size - 4} more recordings")
+                                    TextButton(
+                                        onClick = {
+                                            if (showAllExpanded) {
+                                                historyListState.requestScrollToItem(headerIndex(groupKey))
+                                            }
+                                            showAllExpanded = !showAllExpanded
+                                        },
+                                    ) {
+                                        Text(if (showAllExpanded) "Show fewer"
+                                            else "View remaining ${group.size - 4} recordings",
+                                            style = MaterialTheme.typography.labelMedium)
+                                        Spacer(Modifier.width(4.dp))
+                                        Icon(
+                                            painterResource(
+                                                if (showAllExpanded) R.drawable.ic_manager_chevron_up
+                                                else R.drawable.ic_manager_chevron_down
+                                            ),
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp),
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -504,28 +533,102 @@ private fun RecordingPlayer(
             delay(250)
         }
     }
-    Column(Modifier.fillMaxWidth().padding(start = 68.dp, end = 16.dp, bottom = 12.dp)) {
-        Text("Playback", style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        Slider(
-            value = position.coerceIn(0f, duration),
-            onValueChange = {
-                position = it
-                player?.seekTo(it.toInt())
-            },
-            valueRange = 0f..duration,
-            enabled = player != null,
-        )
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            TextButton(enabled = player != null, onClick = {
+    val playedColor = MaterialTheme.colorScheme.primary
+    val trackColor = MaterialTheme.colorScheme.surfaceVariant
+    fun seekToFraction(fraction: Float) {
+        val next = (fraction.coerceIn(0f, 1f) * duration).roundToInt()
+        position = next.toFloat()
+        runCatching { player?.seekTo(next) }
+    }
+    Column(
+        Modifier.fillMaxWidth()
+            .padding(start = 68.dp, end = 16.dp, bottom = 6.dp, top = 2.dp)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.18f),
+                RoundedCornerShape(12.dp))
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp),
+    ) {
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                millisLabel(position.toInt()),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Canvas(
+                Modifier.weight(1f).height(34.dp)
+                    .semantics {
+                        progressBarRangeInfo = ProgressBarRangeInfo(
+                            position.coerceIn(0f, duration), 0f..duration,
+                        )
+                    }
+                    .pointerInput(duration, player) {
+                        detectTapGestures { offset ->
+                            if (player != null) seekToFraction(offset.x / size.width.coerceAtLeast(1))
+                        }
+                    }
+                    .pointerInput(duration, player) {
+                        detectDragGestures(
+                            onDragStart = { offset ->
+                                if (player != null) seekToFraction(offset.x / size.width.coerceAtLeast(1))
+                            },
+                            onDrag = { change, _ ->
+                                change.consume()
+                                if (player != null) seekToFraction(change.position.x / size.width.coerceAtLeast(1))
+                            },
+                        )
+                    },
+            ) {
+                val y = size.height / 2f
+                val fraction = (position / duration).coerceIn(0f, 1f)
+                val x = size.width * fraction
+                drawLine(trackColor, Offset(0f, y), Offset(size.width, y),
+                    strokeWidth = 4.dp.toPx(), cap = StrokeCap.Round)
+                drawLine(playedColor, Offset(0f, y), Offset(x, y),
+                    strokeWidth = 4.dp.toPx(), cap = StrokeCap.Round)
+                drawCircle(playedColor, radius = 6.dp.toPx(),
+                    center = Offset(x.coerceIn(6.dp.toPx(), size.width - 6.dp.toPx()), y))
+            }
+            Text(
+                millisLabel(duration.toInt()),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            IconButton(onClick = {
                 player?.let {
-                    if (it.isPlaying) { it.pause(); playing = false }
-                    else { it.start(); playing = true }
+                    runCatching {
+                        if (it.isPlaying) { it.pause(); playing = false }
+                        else { it.start(); playing = true }
+                    }.onFailure { error = it.localizedMessage ?: "Playback failed" }
                 }
-            }) { Text(if (playing) "Pause" else "Play") }
-            TextButton(onClick = onShare) { Text("Share") }
-            TextButton(onClick = onClose) { Text("Close") }
+            }, enabled = player != null, modifier = Modifier.size(38.dp)) {
+                Icon(
+                    painterResource(if (playing) R.drawable.ic_manager_pause else R.drawable.ic_manager_play),
+                    contentDescription = if (playing) "Pause" else "Play",
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            IconButton(onClick = onShare, modifier = Modifier.size(38.dp)) {
+                Icon(painterResource(R.drawable.ic_manager_share),
+                    contentDescription = "Share recording", modifier = Modifier.size(20.dp))
+            }
+            IconButton(onClick = onClose, modifier = Modifier.size(38.dp)) {
+                Icon(painterResource(R.drawable.ic_manager_close),
+                    contentDescription = "Close player", modifier = Modifier.size(20.dp))
+            }
         }
     }
+}
+
+private fun millisLabel(value: Int): String {
+    val seconds = (value.coerceAtLeast(0) / 1000)
+    return "%02d:%02d".format(Locale.getDefault(), seconds / 60, seconds % 60)
 }
