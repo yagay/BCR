@@ -35,7 +35,7 @@ internal fun directionLabel(direction: String): String = when (direction) {
  */
 internal fun dialablePhoneNumber(value: String): String? {
     val trimmed = value.trim()
-    if (trimmed.isEmpty() || !trimmed.matches(Regex("""\\+?[0-9 ()-]+"""))) return null
+    if (trimmed.isEmpty() || !trimmed.matches(Regex("""\+?[0-9 ()-]+"""))) return null
     val digits = trimmed.count(Char::isDigit)
     if (digits !in 3..15) return null
     return trimmed
