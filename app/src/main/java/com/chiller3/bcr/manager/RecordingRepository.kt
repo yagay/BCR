@@ -26,6 +26,9 @@ internal data class ManagedRecording(
     val direction: String,
     val timestamp: Long,
     val durationSeconds: Long,
+    val simSlot: Int? = null,
+    val sizeBytes: Long = -1L,
+    val format: String = "",
 ) {
     val uri: Uri get() = file.uri
     val dateLabel: String get() = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
@@ -37,6 +40,7 @@ internal class RecordingRepository(private val context: Context) {
 
     // Default BCR filename layout, with optional direction/SIM/contact suffix.
     // Custom templates still work with JSON, otherwise keep a usable filename.
+    private val simName = Regex("""(?:^|_)sim([0-9]+)(?:_|$)""", RegexOption.IGNORE_CASE)
     private val defaultName = Regex(
         """^(\d{8}_\d{6}(?:\.\d+)?(?:[+-]\d{4})?)(?:_(in|out|conference))?(?:_sim\d+)?(?:_([+\d][+\d -]*|unknown))?(?:_(.*))?$""",
         RegexOption.IGNORE_CASE,
@@ -84,6 +88,8 @@ internal class RecordingRepository(private val context: Context) {
                 }.getOrNull()
             }
             val firstCall = json?.optJSONArray("calls")?.optJSONObject(0)
+            val output = json?.optJSONObject("output")
+            val recordingJson = output?.optJSONObject("recording")
             fun clean(value: String?): String? = value?.takeIf { it.isNotBlank() && it != "null" }
             val fallback = defaultName.matchEntire(name.substringBeforeLast('.'))
             val number = firstCall?.optString("phone_number_formatted")?.let(::clean)
@@ -115,8 +121,12 @@ internal class RecordingRepository(private val context: Context) {
                     ?: fallback?.groupValues?.get(2).orEmpty(),
                 timestamp = json?.optLong("timestamp_unix_ms")?.takeIf { it > 0 }
                     ?: filenameTimestamp ?: file.lastModified(),
-                durationSeconds = json?.optJSONObject("output")?.optJSONObject("recording")
-                    ?.optLong("duration_secs_encoded") ?: 0,
+                durationSeconds = recordingJson?.optDouble("duration_secs_encoded")
+                    ?.takeIf { it > 0 }?.toLong() ?: 0L,
+                simSlot = firstCall?.optInt("sim_slot", -1)?.takeIf { it >= 0 }
+                    ?: simName.find(name.substringBeforeLast('.'))?.groupValues?.get(1)?.toIntOrNull(),
+                sizeBytes = file.length(),
+                format = name.substringAfterLast('.', "").uppercase(Locale.ROOT),
             )
         }.sortedByDescending { it.timestamp }
     }
@@ -136,15 +146,37 @@ internal class RecordingRepository(private val context: Context) {
         }
     }
 
-    fun delete(items: List<ManagedRecording>): Int {
+    data class DeleteResult(val deleted: Int, val metadataFailures: Int, val failedUris: Set<String>)
+
+    fun delete(items: List<ManagedRecording>, all: List<ManagedRecording>): DeleteResult {
         var deleted = 0
-        for (item in items) {
-            // Never delete metadata before deleting the associated audio.
-            if (item.file.delete()) {
-                item.metadata?.delete()
+        var metadataFailures = 0
+        val failed = mutableSetOf<String>()
+        val deletedMetadataCandidates = mutableSetOf<String>()
+        // Audio deletion is authoritative; never delete JSON if any associated
+        // audio file survives (including another recording outside selection).
+        for (item in items.distinctBy { it.uri.toString() }) {
+            val ok = runCatching { item.file.delete() }.getOrDefault(false)
+            if (ok) {
                 deleted++
+                item.metadata?.let { deletedMetadataCandidates.add(it.uri.toString()) }
+            } else {
+                failed.add(item.uri.toString())
             }
         }
-        return deleted
+        for (metadataUri in deletedMetadataCandidates) {
+            val siblings = all.filter { it.metadata?.uri?.toString() == metadataUri }
+            val anyRemaining = siblings.any { sibling ->
+                sibling.uri.toString() !in items.map { it.uri.toString() }.toSet() ||
+                    sibling.uri.toString() in failed
+            }
+            if (!anyRemaining) {
+                val metadataFile = siblings.firstOrNull()?.metadata
+                if (metadataFile != null && !runCatching { metadataFile.delete() }.getOrDefault(false)) {
+                    metadataFailures++
+                }
+            }
+        }
+        return DeleteResult(deleted, metadataFailures, failed)
     }
 }
