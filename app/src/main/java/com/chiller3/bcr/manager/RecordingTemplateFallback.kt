@@ -8,7 +8,11 @@ package com.chiller3.bcr.manager
 import com.chiller3.bcr.template.Template
 
 internal class RecordingTemplateFallback(templates: List<Template>) {
-    private data class Part(val literal: String? = null, val variable: String? = null)
+    private data class Part(
+        val literal: String? = null,
+        val variable: String? = null,
+        val argument: String? = null,
+    )
     private data class Pattern(
         val regex: Regex,
         val variableNames: List<String>,
@@ -24,9 +28,11 @@ internal class RecordingTemplateFallback(templates: List<Template>) {
                 }) return@mapNotNull null
             val names = parts.mapNotNull { it.variable }
             val source = parts.joinToString("") { p ->
-                p.literal?.let(Regex::escape) ?: "(.+?)"
+                p.literal?.let(Regex::escape)
+                    ?: capturePattern(p.variable.orEmpty(), p.argument)
+                    ?: return@mapNotNull null
             }
-            val compiled = runCatching { Regex("^$source$") }.getOrNull()
+            val compiled = runCatching { Regex("^$source$", RegexOption.IGNORE_CASE) }.getOrNull()
                 ?: return@mapNotNull null
             Pattern(compiled, names, names.size * 100 + parts.sumOf { it.literal?.length ?: 0 })
         }
@@ -49,7 +55,7 @@ internal class RecordingTemplateFallback(templates: List<Template>) {
         for (clause in template.clauses) {
             val choices: List<List<Part>> = when (clause) {
                 is Template.StringLiteral -> listOf(listOf(Part(literal = clause.value)))
-                is Template.VariableRef -> listOf(listOf(Part(variable = clause.name)))
+                is Template.VariableRef -> listOf(listOf(Part(variable = clause.name, argument = clause.arg)))
                 is Template.Fallback -> clause.choices.flatMap(::expand)
             }
             variants = variants.flatMap { base ->
@@ -57,5 +63,57 @@ internal class RecordingTemplateFallback(templates: List<Template>) {
             }.take(128)
         }
         return variants
+    }
+
+    /**
+     * Type-aware captures prevent the date variable from consuming directory
+     * separators or later fields. Unsupported datetime patterns are not
+     * inverted, because guessing a contact's identity would be unsafe.
+     */
+    private fun capturePattern(name: String, argument: String?): String? = when (name) {
+        "date" -> dateCapture(argument)
+        "direction" -> "(in|out|conference)"
+        "sim_slot" -> "([0-9]+)"
+        "phone_number" -> "([+0-9() .,\\-]+?)"
+        "contact_name", "caller_name", "call_log_name" -> "(.+?)"
+        else -> null
+    }
+
+    private fun dateCapture(pattern: String?): String? {
+        if (pattern == null) {
+            return "(\\d{8}_\\d{6}(?:\\.\\d{1,9})?(?:[+-]\\d{4,6})?)"
+        }
+        if (pattern == "unix_s") return "(\\d{10,12})"
+        if (pattern == "unix_ms") return "(\\d{13,16})"
+        // Parse numeric DateTimeFormatter tokens, preserving literal separators.
+        val result = StringBuilder()
+        var i = 0
+        while (i < pattern.length) {
+            val ch = pattern[i]
+            if (ch == '\'') {
+                val closing = pattern.indexOf('\'', i + 1)
+                if (closing < 0) return null
+                result.append(Regex.escape(pattern.substring(i + 1, closing)))
+                i = closing + 1
+                continue
+            }
+            if (!ch.isLetter()) {
+                result.append(Regex.escape(ch.toString()))
+                i++
+                continue
+            }
+            var end = i + 1
+            while (end < pattern.length && pattern[end] == ch) end++
+            val count = end - i
+            val size = when (ch) {
+                'y', 'u' -> if (count == 2) 2 else 4
+                'M', 'd', 'H', 'h', 'm', 's' -> if (count <= 2) count else return null
+                'S' -> count
+                else -> return null
+            }
+            result.append("\\d{").append(size).append("}")
+            i = end
+        }
+        return "(" + result + ")"
     }
 }
