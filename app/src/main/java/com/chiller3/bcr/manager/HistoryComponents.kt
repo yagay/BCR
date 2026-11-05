@@ -231,10 +231,26 @@ internal fun RecordingFileDetails(recording: ManagedRecording) {
                 append("Format: ${recording.format.ifBlank { "Unknown" }}")
                 if (recording.sizeBytes >= 0) append(" · Size: ${formatFileSize(recording.sizeBytes)}")
                 recording.simSlot?.let { append(" · SIM ${it}") }
+                if (recording.sampleRate > 0) append(" · ${recording.sampleRate} Hz")
+                if (recording.channels > 0) append(" · ${recording.channels} ch")
             },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        if (recording.codec.isNotBlank()) {
+            Text(
+                "Codec: ${recording.codec}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (recording.participantNumbers.size > 1) {
+            Text(
+                "Participants: " + recording.participantNumbers.joinToString(", "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Text(
             "Recorded: ${recording.dateLabel} · Length: ${durationLabel(recording.durationSeconds)}",
             style = MaterialTheme.typography.bodySmall,
