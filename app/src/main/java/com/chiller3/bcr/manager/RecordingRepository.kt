@@ -264,6 +264,7 @@ internal class RecordingRepository(private val context: Context) {
                 ?: toEpochMillis(runCatching {
                     generator.parseTimestampFromPath(candidate.relativePath)
                 }.getOrNull())
+                ?: templateFallback.unixTimestampMillis(relativeStem)
                 ?: parseDefaultTimestamp(stem)
                 ?: file.lastModified().takeIf { it > 0 }
                 ?: 0L
