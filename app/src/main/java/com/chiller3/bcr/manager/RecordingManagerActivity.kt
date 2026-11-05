@@ -246,7 +246,15 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                     .forEach { (value, label) ->
                         FilterChip(
                             selected = direction == value,
-                            onClick = { direction = value },
+                            onClick = {
+                                if (direction != value) {
+                                    active = null
+                                    expanded = null
+                                    showAllExpanded = false
+                                    historyListState.requestScrollToItem(0)
+                                    direction = value
+                                }
+                            },
                             label = { Text(label, style = MaterialTheme.typography.labelMedium) },
                             shape = RoundedCornerShape(50),
                         )
@@ -416,6 +424,9 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                                         onClick = {
                                             if (showAllExpanded) {
                                                 historyListState.requestScrollToItem(headerIndex(groupKey))
+                                                if (active != null && group.take(4).none { it.uri == active?.uri }) {
+                                                    active = null
+                                                }
                                             }
                                             showAllExpanded = !showAllExpanded
                                         },
