@@ -179,10 +179,15 @@ android {
     }
 }
 
+// Debug builds deliberately skip embedding the complete Git source archive.
+// The JGit archive task can overflow on large repositories and is not needed
+// for testing the APK. Keep the archive in release variants only.
 androidComponents.onVariants { variant ->
-    variant.sources.assets!!.addGeneratedSourceDirectory(archive) {
-        project.objects.directoryProperty().apply {
-            set(archiveDir)
+    if (variant.buildType != "debug") {
+        variant.sources.assets!!.addGeneratedSourceDirectory(archive) {
+            project.objects.directoryProperty().apply {
+                set(archiveDir)
+            }
         }
     }
 }
@@ -250,7 +255,9 @@ androidComponents.onVariants { variant ->
         }
     }
 
-    variant.lifecycleTasks.registerPreBuild(archive)
+    if (variant.buildType != "debug") {
+        variant.lifecycleTasks.registerPreBuild(archive)
+    }
 
     val moduleProp = tasks.register("moduleProp${capitalized}") {
         inputs.property("projectUrl", projectUrl)
