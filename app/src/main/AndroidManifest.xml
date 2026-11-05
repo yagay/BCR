@@ -119,9 +119,13 @@
             android:name=".settings.SettingsActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".manager.RecordingManagerActivity"
+            android:exported="false" />
+
         <activity-alias
             android:name=".settings.SettingsActivityLauncher"
-            android:targetActivity=".settings.SettingsActivity"
+            android:targetActivity=".manager.RecordingManagerActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
