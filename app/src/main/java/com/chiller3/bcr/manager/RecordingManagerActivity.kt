@@ -596,7 +596,7 @@ private fun RecordingPlayer(
                 modifier = Modifier.size(38.dp)) { Text("+10", style = MaterialTheme.typography.labelSmall) }
             TextButton(onClick = {
                 val index = speeds.indexOf(playback.speed).takeIf { it >= 0 } ?: 1
-                playback.setSpeed(speeds[(index + 1) % speeds.size])
+                playback.changeSpeed(speeds[(index + 1) % speeds.size])
             }, modifier = Modifier.height(38.dp)) {
                 Text("${playback.speed}×", style = MaterialTheme.typography.labelSmall)
             }
