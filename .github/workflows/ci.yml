@@ -34,7 +34,7 @@ jobs:
 
       - name: Build and test
         # Debug build only since release builds require a signing key
-        run: ./gradlew --no-daemon --stacktrace :app:assembleDebug :app:testDebugUnitTest :app:zipDebug -x :app:archive
+        run: ./gradlew --no-daemon --stacktrace :app:assembleDebug :app:testDebugUnitTest -x :app:archive
 
       - name: Print libxposed dependency SHA-512 for strict pinning
         if: always()
@@ -57,11 +57,9 @@ jobs:
           unzip -p "$apk" META-INF/xposed/module.prop | grep -Fx "staticScope=false"
           unzip -p "$apk" META-INF/xposed/scope.list | grep -Fx "system"
           unzip -p "$apk" META-INF/xposed/java_init.list | grep -Fx "com.chiller3.bcr.xposed.BcrModule"
-      - name: Upload experimental APK for device testing
+      - name: Upload LSPosed Debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: BCR-native-lsposed-root-debug
-          path: |
-            app/build/outputs/apk/debug/*.apk
-            app/build/distributions/**/*.zip
+          name: BCR-native-lsposed-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
