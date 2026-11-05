@@ -276,12 +276,12 @@ internal class RecordingRepository(private val context: Context) {
                 number = number,
                 normalizedNumber = canonical.orEmpty(),
                 contactName = contactName.orEmpty(),
-                direction = clean(json?.optString("direction"))
-                    ?: field("direction")?.lowercase(Locale.ROOT)?.takeIf {
-                        it in setOf("in", "out", "conference")
-                    }
+                direction = (clean(json?.optString("direction"))
+                    ?: field("direction")
                     ?: clean(fallback?.groupValues?.get(2))
-                    ?: "",
+                    ?: "").lowercase(Locale.ROOT).takeIf {
+                        it in setOf("in", "out", "conference")
+                    }.orEmpty(),
                 timestamp = parsedTime,
                 durationSeconds = recordingJson?.optDouble("duration_secs_encoded")
                     ?.takeIf { it > 0 }?.toLong() ?: 0L,
