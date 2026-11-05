@@ -7,6 +7,7 @@ package com.chiller3.bcr.manager
 import android.content.ClipData
 import android.content.Intent
 import android.media.MediaPlayer
+import android.net.Uri
 import android.os.Bundle
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -256,6 +257,25 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                             )
                         }
                         if (expanded == groupKey) {
+                            val phoneNumbers = group.mapNotNull { dialablePhoneNumber(it.number) }
+                                .distinctBy { it.filter(Char::isDigit) }
+                            item(key = "contact-details:$groupKey") {
+                                RecordingContactDetails(
+                                    name = first.title,
+                                    numbers = phoneNumbers,
+                                    onDial = { number ->
+                                        val dialIntent = Intent(Intent.ACTION_DIAL).apply {
+                                            data = Uri.fromParts("tel", number, null)
+                                        }
+                                        runCatching {
+                                            context.startActivity(dialIntent)
+                                        }.onFailure {
+                                            operationMessage = it.localizedMessage
+                                                ?: "Unable to open the phone dialer"
+                                        }
+                                    },
+                                )
+                            }
                             items(group, key = { file -> "recording:${file.uri}" }) { file ->
                                 val id = file.uri.toString()
                                 Column(Modifier.fillMaxWidth().animateContentSize()) {
