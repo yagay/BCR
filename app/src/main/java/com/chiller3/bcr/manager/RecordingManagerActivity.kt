@@ -163,7 +163,11 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                             Modifier.fillMaxWidth().combinedClickable(
                                 onClick = { expanded = if (open) null else groupKey },
                                 onLongClick = {
-                                    if (selected.isEmpty()) selected.add(first.uri.toString())
+                                    // Select this contact's recordings together.
+                                    group.forEach { file ->
+                                        val key = file.uri.toString()
+                                        if (key !in selected) selected.add(key)
+                                    }
                                 },
                             ).padding(16.dp),
                         ) {
