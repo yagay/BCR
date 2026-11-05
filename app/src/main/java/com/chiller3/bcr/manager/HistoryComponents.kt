@@ -12,6 +12,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
@@ -103,6 +106,7 @@ internal fun HistoryDateHeader(text: String) {
 internal fun CallHistoryRow(
     title: String,
     detail: String,
+    profile: ContactProfile? = null,
     expanded: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
@@ -119,7 +123,14 @@ internal fun CallHistoryRow(
                 .background(MaterialTheme.colorScheme.secondaryContainer),
             contentAlignment = Alignment.Center,
         ) {
-            if (title.trim().firstOrNull()?.isLetter() == true) {
+            if (profile?.photo != null) {
+                Image(
+                    bitmap = profile.photo.asImageBitmap(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else if (title.trim().firstOrNull()?.isLetter() == true) {
                 Text(
                     text = title.trim().first().uppercaseChar().toString(),
                     style = MaterialTheme.typography.titleMedium,
@@ -135,7 +146,8 @@ internal fun CallHistoryRow(
             }
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium,
+            Text(profile?.displayName?.takeIf { it.isNotBlank() } ?: title,
+                style = MaterialTheme.typography.titleMedium,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(detail, style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -183,7 +195,8 @@ internal fun RecordingHistoryRow(
                     "out" -> "↗"
                     "conference" -> "◈"
                     else -> "•"
-                }}  ${durationLabel(recording.durationSeconds)}",
+                }}  ${durationLabel(recording.durationSeconds)}" +
+                    (recording.simSlot?.let { " · SIM ${it + 1}" } ?: ""),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
