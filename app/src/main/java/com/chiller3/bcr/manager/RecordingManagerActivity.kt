@@ -9,6 +9,7 @@ import android.content.Intent
 import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Bundle
+import java.text.DateFormat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -28,10 +29,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.chiller3.bcr.R
 import com.chiller3.bcr.RecorderProvider
 import com.chiller3.bcr.settings.SettingsActivity
 import com.chiller3.bcr.ui.theme.AppTheme
@@ -76,6 +80,7 @@ private fun ManagerScreen(onSettings: () -> Unit) {
     var error by remember { mutableStateOf<String?>(null) }
     var refresh by remember { mutableIntStateOf(0) }
     var query by remember { mutableStateOf("") }
+    var searchVisible by remember { mutableStateOf(false) }
     var direction by remember { mutableStateOf("all") }
     var expanded by remember { mutableStateOf<String?>(null) }
     val historyListState = rememberLazyListState()
@@ -167,21 +172,45 @@ private fun ManagerScreen(onSettings: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (selected.isEmpty()) "Recordings" else "${selected.size} selected") },
+                title = {
+                    Text(
+                        if (selected.isEmpty()) "Recordings" else "${selected.size} selected",
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                },
                 actions = {
-                    TextButton(onClick = { refresh++ }, enabled = !loading) { Text("Refresh") }
-                    TextButton(onClick = onSettings) { Text("Settings") }
+                    IconButton(onClick = {
+                        searchVisible = !searchVisible
+                        if (!searchVisible) query = ""
+                    }) {
+                        Icon(
+                            painterResource(
+                                if (searchVisible) R.drawable.ic_manager_close
+                                else R.drawable.ic_manager_search
+                            ),
+                            contentDescription = if (searchVisible) "Close search" else "Search recordings",
+                        )
+                    }
+                    IconButton(onClick = { refresh++ }, enabled = !loading) {
+                        Icon(painterResource(R.drawable.ic_manager_refresh), contentDescription = "Refresh recordings")
+                    }
+                    IconButton(onClick = onSettings) {
+                        Icon(painterResource(R.drawable.ic_manager_settings), contentDescription = "Settings")
+                    }
                 },
             )
         },
-
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            OutlinedTextField(
-                value = query, onValueChange = { query = it },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-                label = { Text("Search contact, number or file") }, singleLine = true,
-            )
+            if (searchVisible) {
+                OutlinedTextField(
+                    value = query, onValueChange = { query = it },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                    placeholder = { Text("Search contact, number or file") },
+                    leadingIcon = { Icon(painterResource(R.drawable.ic_manager_search), contentDescription = null) },
+                    singleLine = true,
+                )
+            }
             Row(
                 modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
                     .padding(horizontal = 12.dp),
@@ -219,14 +248,20 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                         val first = group.first()
                         val day = dateFormat.format(Date(first.timestamp))
                         if (day != previousDay) {
-                            item(key = "day:$day") { HistoryDateHeader(day) }
+                            item(key = "day:$day") {
+                                HistoryDateHeader(
+                                    DateFormat.getDateInstance(DateFormat.MEDIUM)
+                                        .format(Date(first.timestamp))
+                                )
+                            }
                             previousDay = day
                         }
                         val groupKey = recordingGroupKey(first)
                         item(key = "group:$groupKey") {
                             CallHistoryRow(
                                 title = first.title,
-                                detail = "${directionLabel(first.direction)} · ${first.dateLabel}",
+                                detail = "${directionLabel(first.direction)} · " +
+                                    DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(first.timestamp)),
                                 count = group.size,
                                 expanded = expanded == groupKey,
                                 onClick = {
@@ -261,7 +296,6 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                                 .distinctBy { it.filter(Char::isDigit) }
                             item(key = "contact-details:$groupKey") {
                                 RecordingContactDetails(
-                                    name = first.title,
                                     numbers = phoneNumbers,
                                     onDial = { number ->
                                         val dialIntent = Intent(Intent.ACTION_DIAL).apply {
@@ -449,7 +483,8 @@ private fun RecordingPlayer(
         }
     }
     Column(Modifier.fillMaxWidth().padding(start = 68.dp, end = 16.dp, bottom = 12.dp)) {
-        Text(recording.title, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+        Text("Playback", style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         Slider(
             value = position.coerceIn(0f, duration),
