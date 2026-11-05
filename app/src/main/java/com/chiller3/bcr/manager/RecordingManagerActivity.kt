@@ -244,25 +244,27 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                                     }
                                 },
                             )
-                            if (expanded == groupKey) {
-                                group.forEach { file ->
-                                    val id = file.uri.toString()
-                                    RecordingHistoryRow(
-                                        recording = file,
-                                        checked = if (selected.isEmpty()) null else id in selected,
-                                        onClick = {
-                                            if (selected.isNotEmpty()) {
-                                                if (id in selected) selected.remove(id)
-                                                else selected.add(id)
-                                            } else active = file
-                                        },
-                                        onLongClick = {
-                                            if (id !in selected) selected.add(id)
-                                        },
-                                        onPlay = { active = file },
-                                    )
-                                }
+                        }
+                        if (expanded == groupKey) {
+                            items(group, key = { file -> "recording:${file.uri}" }) { file ->
+                                val id = file.uri.toString()
+                                RecordingHistoryRow(
+                                    recording = file,
+                                    checked = if (selected.isEmpty()) null else id in selected,
+                                    onClick = {
+                                        if (selected.isNotEmpty()) {
+                                            if (id in selected) selected.remove(id)
+                                            else selected.add(id)
+                                        } else active = file
+                                    },
+                                    onLongClick = {
+                                        if (id !in selected) selected.add(id)
+                                    },
+                                    onPlay = { active = file },
+                                )
                             }
+                        }
+                        item(key = "divider:$groupKey") {
                             HorizontalDivider(
                                 modifier = Modifier.padding(start = 68.dp),
                                 color = MaterialTheme.colorScheme.outlineVariant,
