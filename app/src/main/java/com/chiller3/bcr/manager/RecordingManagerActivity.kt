@@ -144,6 +144,20 @@ private fun ManagerScreen(onSettings: () -> Unit) {
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     var operationMessage by remember { mutableStateOf<String?>(null) }
+    fun openWithExternalPlayer(file: ManagedRecording) {
+        val uri = RecorderProvider.fromOrigUri(file.uri)
+        val mime = file.mimeType.takeIf { it.startsWith("audio/") } ?: "audio/*"
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, mime)
+            clipData = ClipData.newUri(context.contentResolver, "Recording", uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        runCatching { context.startActivity(Intent.createChooser(intent, "Open recording with")) }
+            .onFailure {
+                operationMessage = it.localizedMessage ?: "Unable to open external player"
+            }
+    }
+
 
     LaunchedEffect(refresh) {
         loading = true
@@ -435,18 +449,21 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                                         onDetails = { detailsVisible = !detailsVisible },
                                     )
                                     if (detailsVisible) {
-                                        RecordingFileDetails(file)
+                                        RecordingFileDetails(file, onOpenExternal = {
+                                            openWithExternalPlayer(file)
+                                        })
                                     }
                                     if (selected.isEmpty() && active?.uri == file.uri) {
                                         key(file.uri) {
                                             RecordingPlayer(
                                                 recording = file,
                                                 playback = playback,
+                                                onOpenExternal = { openWithExternalPlayer(file) },
                                                 onClose = { active = null },
                                                 onShare = {
                                                     val uri = RecorderProvider.fromOrigUri(file.uri)
                                                     val intent = Intent(Intent.ACTION_SEND).apply {
-                                                        type = file.file.type ?: "audio/*"
+                                                        type = file.mimeType.ifBlank { "audio/*" }
                                                         putExtra(Intent.EXTRA_STREAM, uri)
                                                         clipData = ClipData.newUri(context.contentResolver, "Recording", uri)
                                                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -556,6 +573,7 @@ private fun ManagerScreen(onSettings: () -> Unit) {
 private fun RecordingPlayer(
     recording: ManagedRecording,
     playback: RecordingPlaybackController,
+    onOpenExternal: () -> Unit,
     onClose: () -> Unit,
     onShare: () -> Unit,
 ) {
@@ -580,7 +598,12 @@ private fun RecordingPlayer(
             .padding(horizontal = 10.dp, vertical = 5.dp),
     ) {
         playback.error?.let {
-            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(it, modifier = Modifier.weight(1f),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall)
+                TextButton(onClick = onOpenExternal) { Text("Open with…") }
+            }
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
