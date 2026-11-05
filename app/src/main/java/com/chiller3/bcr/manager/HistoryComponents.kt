@@ -8,6 +8,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -26,6 +27,62 @@ internal fun directionLabel(direction: String): String = when (direction) {
     "out" -> "↗ Outgoing"
     "conference" -> "◈ Conference"
     else -> "• Recording"
+}
+
+/**
+ * Only offer calling for actual phone-number-shaped metadata. Never interpret a
+ * contact name or recording filename as a telephone number.
+ */
+internal fun dialablePhoneNumber(value: String): String? {
+    val trimmed = value.trim()
+    if (trimmed.isEmpty() || !trimmed.matches(Regex("""\\+?[0-9 ()-]+"""))) return null
+    val digits = trimmed.count(Char::isDigit)
+    if (digits !in 3..15) return null
+    return trimmed
+}
+
+@Composable
+internal fun RecordingContactDetails(
+    name: String,
+    numbers: List<String>,
+    onDial: (String) -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(start = 68.dp, end = 16.dp, bottom = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            text = "Contact details",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(name, style = MaterialTheme.typography.bodyMedium)
+        if (numbers.isEmpty()) {
+            Text(
+                "No phone number in this recording",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            numbers.forEach { number ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        number,
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    TextButton(onClick = { onDial(number) }) { Text("Dial") }
+                }
+            }
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    }
 }
 
 @Composable
