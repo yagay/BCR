@@ -72,15 +72,18 @@ class RecordingManagerActivity : ComponentActivity() {
     }
 }
 
-/** Stable grouping key: unknown/private callers must never collapse into one contact. */
-private fun recordingGroupKey(file: ManagedRecording): String {
-    val digits = (file.normalizedNumber.ifBlank { file.number }).filter(Char::isDigit)
-    if (digits.length >= 7) return "number:$digits"
-    val name = file.title.trim().lowercase()
-    if (name.isBlank() || name in setOf("unknown", "<unknown>", "private", "blocked", "anonymous", "unavailable")) {
-        return "recording:${file.uri}"
-    }
-    return "name:$name"
+/**
+ * Cross-day grouping. Prefer an explicit contact identity; resolve older
+ * recordings with the same normalized number to that identity as well.
+ * Unknown/private callers without a number always keep separate groups.
+ */
+private fun recordingGroupKey(file: ManagedRecording, aliases: Map<String, String>): String {
+    val phone = (file.normalizedNumber.ifBlank { file.number }).filter(Char::isDigit)
+    val named = file.contactName.trim().lowercase(Locale.getDefault())
+        .takeIf { it.isNotBlank() && it !in setOf("unknown", "private", "blocked", "anonymous", "unavailable") }
+    if (named != null) return "contact:$named"
+    if (phone.length >= 7) return aliases[phone] ?: "number:$phone"
+    return "recording:${file.uri}"
 }
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -105,6 +108,13 @@ private fun ManagerScreen(onSettings: () -> Unit) {
     val selected = remember { mutableStateListOf<String>() }
     var confirmDelete by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
+    val contactAliases = remember(recordings) {
+        recordings.asSequence().mapNotNull { file ->
+            val name = file.contactName.trim().lowercase(Locale.getDefault())
+            val number = (file.normalizedNumber.ifBlank { file.number }).filter(Char::isDigit)
+            if (name.isNotEmpty() && number.length >= 7) number to "contact:$name" else null
+        }.toMap()
+    }
     // Re-index completed BCR recordings whenever the manager returns to the foreground.
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(playback) { onDispose { playback.close() } }
@@ -149,7 +159,7 @@ private fun ManagerScreen(onSettings: () -> Unit) {
     // initial history loading responsive even with thousands of recordings.
     LaunchedEffect(expanded, showAllExpanded) {
         val key = expanded ?: return@LaunchedEffect
-        val currentGroup = recordings.filter { recordingGroupKey(it) == key }
+        val currentGroup = recordings.filter { recordingGroupKey(it, contactAliases) == key }
             .sortedByDescending { it.timestamp }
         val visible = if (showAllExpanded) currentGroup else currentGroup.take(4)
         val missing = visible.filter { it.durationSeconds <= 0L }
@@ -172,7 +182,7 @@ private fun ManagerScreen(onSettings: () -> Unit) {
             (r.title.contains(query, true) || r.number.contains(query, true) ||
                 r.file.name.orEmpty().contains(query, true))
     }
-    val groups = filtered.groupBy(::recordingGroupKey)
+    val groups = filtered.groupBy { recordingGroupKey(it, contactAliases) }
         .values.map { it.sortedByDescending(ManagedRecording::timestamp) }
         .sortedByDescending { it.first().timestamp }
 
@@ -190,7 +200,7 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                 index++
                 previousDay = day
             }
-            if (recordingGroupKey(group.first()) == key) return index
+            if (recordingGroupKey(group.first(), contactAliases) == key) return index
             index++
         }
         return 0
@@ -300,7 +310,7 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                             }
                             previousDay = day
                         }
-                        val groupKey = recordingGroupKey(first)
+                        val groupKey = recordingGroupKey(first, contactAliases)
                         item(key = "group:$groupKey") {
                             val contactNumber = group.firstOrNull {
                                 dialablePhoneNumber(it.number) != null
