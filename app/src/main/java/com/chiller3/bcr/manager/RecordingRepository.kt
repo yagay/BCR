@@ -164,10 +164,11 @@ internal class RecordingRepository(private val context: Context) {
                 failed.add(item.uri.toString())
             }
         }
+        val selectedUris = items.map { it.uri.toString() }.toSet()
         for (metadataUri in deletedMetadataCandidates) {
             val siblings = all.filter { it.metadata?.uri?.toString() == metadataUri }
             val anyRemaining = siblings.any { sibling ->
-                sibling.uri.toString() !in items.map { it.uri.toString() }.toSet() ||
+                sibling.uri.toString() !in selectedUris ||
                     sibling.uri.toString() in failed
             }
             if (!anyRemaining) {
