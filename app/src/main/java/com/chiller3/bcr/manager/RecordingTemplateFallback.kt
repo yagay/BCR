@@ -27,11 +27,14 @@ internal class RecordingTemplateFallback(templates: List<Template>) {
                     a.variable != null && b.variable != null
                 }) return@mapNotNull null
             val names = parts.mapNotNull { it.variable }
-            val source = parts.joinToString("") { p ->
-                p.literal?.let(Regex::escape)
-                    ?: capturePattern(p.variable.orEmpty(), p.argument)
+            val fragments = mutableListOf<String>()
+            for (part in parts) {
+                val fragment = part.literal?.let(Regex::escape)
+                    ?: capturePattern(part.variable.orEmpty(), part.argument)
                     ?: return@mapNotNull null
+                fragments.add(fragment)
             }
+            val source = fragments.joinToString("")
             val compiled = runCatching { Regex("^$source$", RegexOption.IGNORE_CASE) }.getOrNull()
                 ?: return@mapNotNull null
             Pattern(compiled, names, names.size * 100 + parts.sumOf { it.literal?.length ?: 0 })
