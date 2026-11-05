@@ -92,7 +92,7 @@ internal class RecordingPlaybackController(private val context: Context) {
         }.onFailure { error = it.localizedMessage ?: "Playback failed" }
     }
 
-    fun setSpeed(value: Float) {
+    fun changeSpeed(value: Float) {
         speed = value
         val mp = mediaPlayer ?: return
         // Android may implicitly resume when setPlaybackParams() is invoked on
