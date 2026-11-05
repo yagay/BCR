@@ -23,6 +23,7 @@ internal data class ManagedRecording(
     val metadata: DocumentFile?,
     val title: String,
     val number: String,
+    val normalizedNumber: String = "",
     val direction: String,
     val timestamp: Long,
     val durationSeconds: Long,
@@ -117,13 +118,14 @@ internal class RecordingRepository(private val context: Context) {
                 metadata = companion,
                 title = title,
                 number = number,
+                normalizedNumber = firstCall?.optString("phone_number_e164")?.let(::clean).orEmpty(),
                 direction = json?.optString("direction")?.let(::clean)
                     ?: fallback?.groupValues?.get(2).orEmpty(),
                 timestamp = json?.optLong("timestamp_unix_ms")?.takeIf { it > 0 }
                     ?: filenameTimestamp ?: file.lastModified(),
                 durationSeconds = recordingJson?.optDouble("duration_secs_encoded")
                     ?.takeIf { it > 0 }?.toLong() ?: 0L,
-                simSlot = firstCall?.optInt("sim_slot", -1)?.takeIf { it >= 0 }
+                simSlot = json?.optInt("sim_slot", -1)?.takeIf { it > 0 }
                     ?: simName.find(name.substringBeforeLast('.'))?.groupValues?.get(1)?.toIntOrNull(),
                 sizeBytes = file.length(),
                 format = name.substringAfterLast('.', "").uppercase(Locale.ROOT),
