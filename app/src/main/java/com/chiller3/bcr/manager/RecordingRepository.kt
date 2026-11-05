@@ -61,7 +61,7 @@ internal class RecordingRepository(private val context: Context) {
                 if (file.isDirectory) {
                     directories.add(file to path)
                 } else {
-                    val extension = name.substringAfterLast('.', "").lowercase()
+                    val extension = name.substringAfterLast('.', "").lowercase(Locale.ROOT)
                     if (extension in extensions) {
                         audio.add(file)
                         paths[file.uri.toString()] = path
@@ -96,7 +96,7 @@ internal class RecordingRepository(private val context: Context) {
                 ?: number.ifBlank { name.substringBeforeLast('.') }
             val filenameTimestamp = fallback?.groupValues?.get(1)?.let { encoded ->
                 runCatching {
-                    val parts = Regex("""^(\\d{8}_\\d{6})(?:\\.(\\d{1,3}))?([+-]\\d{4})?$""")
+                    val parts = Regex("""^(\d{8}_\d{6})(?:\.(\d{1,3}))?([+-]\d{4})?$""")
                         .matchEntire(encoded) ?: return@runCatching null
                     val millis = parts.groupValues[2].padEnd(3, '0').ifBlank { "000" }
                     val offset = parts.groupValues[3]
