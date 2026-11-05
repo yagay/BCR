@@ -79,7 +79,7 @@ class RecordingManagerActivity : ComponentActivity() {
  */
 private fun recordingGroupKey(file: ManagedRecording, aliases: Map<String, String>): String {
     val phone = (file.normalizedNumber.ifBlank { file.number }).filter(Char::isDigit)
-    val named = file.contactName.trim().lowercase(Locale.getDefault())
+    val named = file.contactName.trim().lowercase(Locale.ROOT)
         .takeIf { it.isNotBlank() && it !in setOf("unknown", "private", "blocked", "anonymous", "unavailable") }
     if (named != null) return "contact:$named"
     if (phone.length >= 7) return aliases[phone] ?: "number:$phone"
@@ -109,11 +109,17 @@ private fun ManagerScreen(onSettings: () -> Unit) {
     var confirmDelete by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
     val contactAliases = remember(recordings) {
-        recordings.asSequence().mapNotNull { file ->
-            val name = file.contactName.trim().lowercase(Locale.getDefault())
-            val number = (file.normalizedNumber.ifBlank { file.number }).filter(Char::isDigit)
-            if (name.isNotEmpty() && number.length >= 7) number to "contact:$name" else null
-        }.toMap()
+        buildMap {
+            // recordings are newest-first. Keep the newest known contact name
+            // as the alias for each canonical number.
+            recordings.forEach { file ->
+                val name = file.contactName.trim().lowercase(Locale.ROOT)
+                val number = (file.normalizedNumber.ifBlank { file.number }).filter(Char::isDigit)
+                if (name.isNotEmpty() && number.length >= 7 && number !in this) {
+                    put(number, "contact:$name")
+                }
+            }
+        }
     }
     // Re-index completed BCR recordings whenever the manager returns to the foreground.
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -323,7 +329,8 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                                 }
                             }
                             CallHistoryRow(
-                                title = first.title,
+                                title = group.firstOrNull { it.contactName.isNotBlank() }
+                                    ?.contactName ?: first.title,
                                 profile = profile,
                                 detail = DateFormat.getTimeInstance(DateFormat.SHORT)
                                     .format(Date(first.timestamp)) + " · ${group.size} recording" +
@@ -359,8 +366,11 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                             )
                         }
                         if (expanded == groupKey) {
-                            val phoneNumbers = group.mapNotNull { dialablePhoneNumber(it.number) }
-                                .distinctBy { it.filter(Char::isDigit) }
+                            val phoneNumbers = group.mapNotNull { file ->
+                                dialablePhoneNumber(file.number)?.let { number ->
+                                    (file.normalizedNumber.ifBlank { number }).filter(Char::isDigit) to number
+                                }
+                            }.distinctBy { it.first }.map { it.second }
                             item(key = "contact-details:$groupKey") {
                                 RecordingContactDetails(
                                     numbers = phoneNumbers,
