@@ -12,6 +12,8 @@ import androidx.documentfile.provider.DocumentFile
 import com.chiller3.bcr.Preferences
 import com.chiller3.bcr.extension.toDocumentFile
 import org.json.JSONObject
+import java.text.SimpleDateFormat
+import java.util.Locale
 import java.text.DateFormat
 import java.util.Date
 
@@ -31,6 +33,13 @@ internal data class ManagedRecording(
 
 internal class RecordingRepository(private val context: Context) {
     private val extensions = setOf("oga", "ogg", "m4a", "mp3", "wav", "flac", "amr", "3gp", "aac", "opus")
+
+    // Default BCR filename layout, with optional direction/SIM/contact suffix.
+    // Custom templates still work with JSON, otherwise keep a usable filename.
+    private val defaultName = Regex(
+        """^(\\d{8}_\\d{6}(?:\\.\\d+)?(?:[+-]\\d{4})?)(?:_(in|out|conference))?(?:_sim\\d+)?(?:_([+\\d][+\\d -]*|unknown))?(?:_(.*))?$""",
+        RegexOption.IGNORE_CASE,
+    )
 
     fun scan(): List<ManagedRecording> {
         val root = Preferences(context).outputDirOrDefault.toDocumentFile(context)
@@ -74,21 +83,30 @@ internal class RecordingRepository(private val context: Context) {
                 }.getOrNull()
             }
             val firstCall = json?.optJSONArray("calls")?.optJSONObject(0)
+            val fallback = defaultName.matchEntire(name.substringBeforeLast('.'))
             val number = firstCall?.optString("phone_number_formatted")?.takeIf { it.isNotBlank() }
                 ?: firstCall?.optString("phone_number")?.takeIf { it.isNotBlank() }
-                ?: ""
+                ?: fallback?.groupValues?.get(3).orEmpty()
             val title = firstCall?.optString("contact_name")?.takeIf { it.isNotBlank() }
                 ?: json?.optString("call_log_name")?.takeIf { it.isNotBlank() }
                 ?: firstCall?.optString("caller_name")?.takeIf { it.isNotBlank() }
+                ?: fallback?.groupValues?.get(4)?.takeIf { it.isNotBlank() }
                 ?: number.ifBlank { name.substringBeforeLast('.') }
+            val filenameTimestamp = fallback?.groupValues?.get(1)?.let { encoded ->
+                runCatching {
+                    val compact = encoded.substringBefore('.').substringBefore('+').substringBeforeLast('-')
+                    SimpleDateFormat("yyyyMMdd_HHmmss", Locale.ROOT).parse(compact)?.time
+                }.getOrNull()
+            }
             ManagedRecording(
                 file = file,
                 metadata = companion,
                 title = title,
                 number = number,
-                direction = json?.optString("direction").orEmpty(),
+                direction = json?.optString("direction")?.takeIf { it.isNotBlank() }
+                    ?: fallback?.groupValues?.get(2).orEmpty(),
                 timestamp = json?.optLong("timestamp_unix_ms")?.takeIf { it > 0 }
-                    ?: file.lastModified(),
+                    ?: filenameTimestamp ?: file.lastModified(),
                 durationSeconds = json?.optJSONObject("output")?.optJSONObject("recording")
                     ?.optLong("duration_secs_encoded") ?: 0,
             )
