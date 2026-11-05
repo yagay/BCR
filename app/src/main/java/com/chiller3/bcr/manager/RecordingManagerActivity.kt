@@ -6,7 +6,6 @@ package com.chiller3.bcr.manager
 
 import android.content.ClipData
 import android.content.Intent
-import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Bundle
 import java.text.DateFormat
@@ -89,6 +88,7 @@ private fun recordingGroupKey(file: ManagedRecording): String {
 private fun ManagerScreen(onSettings: () -> Unit) {
     val context = LocalContext.current
     val repository = remember { RecordingRepository(context.applicationContext) }
+    val playback = remember { RecordingPlaybackController(context.applicationContext) }
     val scope = rememberCoroutineScope()
     var recordings by remember { mutableStateOf<List<ManagedRecording>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
@@ -106,9 +106,18 @@ private fun ManagerScreen(onSettings: () -> Unit) {
     var deleting by remember { mutableStateOf(false) }
     // Re-index completed BCR recordings whenever the manager returns to the foreground.
     val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(playback) { onDispose { playback.close() } }
+    LaunchedEffect(active?.uri) { playback.open(active?.uri) }
+    LaunchedEffect(playback.playing, playback.fileUri) {
+        while (playback.playing) {
+            playback.pollPosition()
+            delay(200)
+        }
+    }
     DisposableEffect(lifecycleOwner) {
         var skipInitialResume = true
         val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) playback.pause()
             if (event == Lifecycle.Event.ON_RESUME) {
                 if (skipInitialResume) skipInitialResume = false
                 else refresh++
@@ -356,6 +365,7 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                                         key(file.uri) {
                                             RecordingPlayer(
                                                 recording = file,
+                                                playback = playback,
                                                 onClose = { active = null },
                                                 onShare = {
                                                     val uri = RecorderProvider.fromOrigUri(file.uri)
@@ -433,12 +443,14 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                     if (files.any { it.uri == active?.uri }) active = null
                     scope.launch {
                         try {
-                            val deleted = withContext(Dispatchers.IO) { repository.delete(files) }
-                            if (deleted == files.size) {
+                            val result = withContext(Dispatchers.IO) { repository.delete(files, recordings) }
+                            val deleted = result.deleted
+                            if (deleted == files.size && result.metadataFailures == 0) {
                                 selected.clear()
                                 operationMessage = "$deleted recording(s) deleted"
                             } else {
-                                operationMessage = "$deleted of ${files.size} deleted. Remaining recordings were kept."
+                                operationMessage = "$deleted of ${files.size} audio files deleted; " +
+                                    "${result.metadataFailures} metadata files could not be removed."
                             }
                             confirmDelete = false
                             refresh++
@@ -463,171 +475,117 @@ private fun ManagerScreen(onSettings: () -> Unit) {
 @Composable
 private fun RecordingPlayer(
     recording: ManagedRecording,
+    playback: RecordingPlaybackController,
     onClose: () -> Unit,
     onShare: () -> Unit,
 ) {
-    val context = LocalContext.current
-    var player by remember { mutableStateOf<MediaPlayer?>(null) }
-    var playing by remember { mutableStateOf(false) }
-    var position by remember { mutableFloatStateOf(0f) }
-    var duration by remember { mutableFloatStateOf(1f) }
-    var error by remember { mutableStateOf<String?>(null) }
-
-    DisposableEffect(recording.uri) {
-        val mp = MediaPlayer()
-        var released = false
-        player = null
-        playing = false
-        position = 0f
-        duration = 1f
-        error = null
-        try {
-            mp.setDataSource(context, recording.uri)
-            mp.setOnPreparedListener {
-                if (!released) {
-                    duration = mp.duration.coerceAtLeast(1).toFloat()
-                    player = mp
-                    runCatching {
-                        mp.start()
-                        playing = true
-                    }.onFailure { error = it.localizedMessage ?: "Playback failed" }
-                }
-            }
-            mp.setOnCompletionListener {
-                if (!released) {
-                    playing = false
-                    position = 0f
-                    runCatching { mp.seekTo(0) }
-                }
-            }
-            mp.setOnErrorListener { _, _, _ ->
-                if (!released) {
-                    playing = false
-                    error = "Cannot play this recording"
-                }
-                true
-            }
-            // Never perform synchronous prepare() on the main/UI thread.
-            mp.prepareAsync()
-        } catch (e: Exception) {
-            error = e.localizedMessage ?: "Playback failed"
-            runCatching { mp.release() }
-            released = true
-        }
-        onDispose {
-            released = true
-            runCatching {
-                mp.setOnPreparedListener(null)
-                mp.setOnCompletionListener(null)
-                mp.setOnErrorListener(null)
-                mp.release()
-            }
-            player = null
-            playing = false
-        }
-    }
-    LaunchedEffect(player, playing) {
-        while (playing) {
-            position = runCatching { player?.currentPosition?.toFloat() ?: 0f }.getOrDefault(0f)
-            delay(250)
-        }
-    }
+    // Only the visual controls are inside the lazy row. The MediaPlayer itself
+    // is screen-scoped and cannot be recycled by LazyColumn.
+    val uri = recording.uri
+    val isCurrent = playback.fileUri == uri
+    val duration = if (isCurrent) playback.durationMs.coerceAtLeast(1) else 1
+    val played = if (isCurrent) playback.positionMs else 0
+    val ready = isCurrent && playback.ready
+    var dragFraction by remember(uri) { mutableStateOf<Float?>(null) }
+    val progress = dragFraction ?: played.toFloat() / duration
     val playedColor = MaterialTheme.colorScheme.primary
     val trackColor = MaterialTheme.colorScheme.surfaceVariant
-    fun seekToFraction(fraction: Float) {
-        val next = (fraction.coerceIn(0f, 1f) * duration).roundToInt()
-        position = next.toFloat()
-        runCatching { player?.seekTo(next) }
-    }
+    val speeds = listOf(0.75f, 1f, 1.25f, 1.5f)
+
     Column(
         Modifier.fillMaxWidth()
             .padding(start = 68.dp, end = 16.dp, bottom = 6.dp, top = 2.dp)
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.18f),
                 RoundedCornerShape(12.dp))
             .padding(horizontal = 10.dp, vertical = 5.dp),
-        verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-        Row(
-            Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(
-                millisLabel(position.toInt()),
+        playback.error?.let {
+            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+        }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(millisLabel((progress * duration).toInt()),
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
             Canvas(
-                Modifier.weight(1f).height(34.dp)
+                Modifier.weight(1f).height(32.dp)
                     .semantics {
                         progressBarRangeInfo = ProgressBarRangeInfo(
-                            position.coerceIn(0f, duration), 0f..duration,
+                            (progress * duration).coerceIn(0f, duration.toFloat()),
+                            0f..duration.toFloat(),
                         )
                     }
-                    .pointerInput(duration, player) {
+                    .pointerInput(uri, duration, ready) {
                         detectTapGestures { offset ->
-                            if (player != null) seekToFraction(offset.x / size.width.coerceAtLeast(1))
+                            if (ready) playback.seek(
+                                (offset.x / size.width.coerceAtLeast(1) * duration).toInt()
+                            )
                         }
                     }
-                    .pointerInput(duration, player) {
+                    .pointerInput(uri, duration, ready) {
                         detectDragGestures(
                             onDragStart = { offset ->
-                                if (player != null) seekToFraction(offset.x / size.width.coerceAtLeast(1))
+                                if (ready) dragFraction =
+                                    (offset.x / size.width.coerceAtLeast(1)).coerceIn(0f, 1f)
                             },
                             onDrag = { change, _ ->
                                 change.consume()
-                                if (player != null) seekToFraction(change.position.x / size.width.coerceAtLeast(1))
+                                if (ready) dragFraction =
+                                    (change.position.x / size.width.coerceAtLeast(1)).coerceIn(0f, 1f)
                             },
+                            onDragEnd = {
+                                dragFraction?.let { playback.seek((it * duration).toInt()) }
+                                dragFraction = null
+                            },
+                            onDragCancel = { dragFraction = null },
                         )
                     },
             ) {
                 val y = size.height / 2f
-                val fraction = (position / duration).coerceIn(0f, 1f)
-                val x = size.width * fraction
+                val x = size.width * progress.coerceIn(0f, 1f)
                 drawLine(trackColor, Offset(0f, y), Offset(size.width, y),
                     strokeWidth = 4.dp.toPx(), cap = StrokeCap.Round)
                 drawLine(playedColor, Offset(0f, y), Offset(x, y),
                     strokeWidth = 4.dp.toPx(), cap = StrokeCap.Round)
-                drawCircle(playedColor, radius = 6.dp.toPx(),
-                    center = Offset(x.coerceIn(6.dp.toPx(), size.width - 6.dp.toPx()), y))
+                drawCircle(playedColor, radius = 5.dp.toPx(), center = Offset(
+                    x.coerceIn(5.dp.toPx(), (size.width - 5.dp.toPx()).coerceAtLeast(5.dp.toPx())), y))
             }
-            Text(
-                millisLabel(duration.toInt()),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Text(millisLabel(duration), style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            IconButton(onClick = {
-                player?.let {
-                    runCatching {
-                        if (it.isPlaying) { it.pause(); playing = false }
-                        else { it.start(); playing = true }
-                    }.onFailure { error = it.localizedMessage ?: "Playback failed" }
-                }
-            }, enabled = player != null, modifier = Modifier.size(38.dp)) {
-                Icon(
-                    painterResource(if (playing) R.drawable.ic_manager_pause else R.drawable.ic_manager_play),
-                    contentDescription = if (playing) "Pause" else "Play",
-                    modifier = Modifier.size(22.dp),
-                )
+            horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            IconButton(onClick = { playback.skip(-10) }, enabled = ready,
+                modifier = Modifier.size(38.dp)) { Text("-10", style = MaterialTheme.typography.labelSmall) }
+            IconButton(onClick = { playback.toggle() }, enabled = ready,
+                modifier = Modifier.size(38.dp)) {
+                Icon(painterResource(if (playback.playing) R.drawable.ic_manager_pause
+                    else R.drawable.ic_manager_play),
+                    contentDescription = if (playback.playing) "Pause" else "Play",
+                    modifier = Modifier.size(22.dp))
+            }
+            IconButton(onClick = { playback.skip(10) }, enabled = ready,
+                modifier = Modifier.size(38.dp)) { Text("+10", style = MaterialTheme.typography.labelSmall) }
+            TextButton(onClick = {
+                val index = speeds.indexOf(playback.speed).takeIf { it >= 0 } ?: 1
+                playback.setSpeed(speeds[(index + 1) % speeds.size])
+            }, modifier = Modifier.height(38.dp)) {
+                Text("${playback.speed}×", style = MaterialTheme.typography.labelSmall)
             }
             Spacer(Modifier.weight(1f))
             IconButton(onClick = onShare, modifier = Modifier.size(38.dp)) {
                 Icon(painterResource(R.drawable.ic_manager_share),
-                    contentDescription = "Share recording", modifier = Modifier.size(20.dp))
+                    contentDescription = "Share recording", modifier = Modifier.size(19.dp))
             }
             IconButton(onClick = onClose, modifier = Modifier.size(38.dp)) {
                 Icon(painterResource(R.drawable.ic_manager_close),
-                    contentDescription = "Close player", modifier = Modifier.size(20.dp))
+                    contentDescription = "Close player", modifier = Modifier.size(19.dp))
             }
         }
     }
 }
 
 private fun millisLabel(value: Int): String {
-    val seconds = (value.coerceAtLeast(0) / 1000)
+    val seconds = value.coerceAtLeast(0) / 1000
     return "%02d:%02d".format(Locale.getDefault(), seconds / 60, seconds % 60)
 }
