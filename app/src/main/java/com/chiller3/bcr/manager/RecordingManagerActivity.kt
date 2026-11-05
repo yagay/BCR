@@ -237,6 +237,7 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                                     }
                                 },
                                 onLongClick = {
+                                    active = null
                                     expanded = groupKey
                                     group.forEach { file ->
                                         val id = file.uri.toString()
@@ -258,6 +259,7 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                                         } else active = file
                                     },
                                     onLongClick = {
+                                        active = null
                                         if (id !in selected) selected.add(id)
                                     },
                                     onPlay = { active = file },
