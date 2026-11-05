@@ -25,7 +25,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import kotlin.math.abs
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -79,7 +78,6 @@ private fun ManagerScreen(onSettings: () -> Unit) {
     var direction by remember { mutableStateOf("all") }
     var expanded by remember { mutableStateOf<String?>(null) }
     val historyListState = rememberLazyListState()
-    var scrollToExpanded by remember { mutableStateOf<String?>(null) }
     var active by remember { mutableStateOf<ManagedRecording?>(null) }
     val selected = remember { mutableStateListOf<String>() }
     var confirmDelete by remember { mutableStateOf(false) }
@@ -146,38 +144,23 @@ private fun ManagerScreen(onSettings: () -> Unit) {
         .sortedByDescending { it.first().timestamp }
 
 
-    // After collapsing the previously expanded (possibly very long) group,
-    // locate the NEW group in the updated lazy-list structure, then put its
-    // header at the top of the viewport, below the fixed search/filter rows.
-    // Counting date headers here is essential: group index != lazy item index.
-    LaunchedEffect(scrollToExpanded) {
-        val target = scrollToExpanded ?: return@LaunchedEffect
+    // Calculate the index in the *collapsed* list. Date headers count as items,
+    // but the old expanded recording rows must not be counted: those are removed
+    // on the same remeasure as the new scroll request.
+    fun headerIndex(key: String): Int {
         val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         var previousDay: String? = null
-        var itemIndex = 0
-        var targetIndex: Int? = null
+        var index = 0
         for (group in groups) {
             val day = dateFormat.format(Date(group.first().timestamp))
             if (day != previousDay) {
-                itemIndex++
+                index++
                 previousDay = day
             }
-            if (recordingGroupKey(group.first()) == target) {
-                targetIndex = itemIndex
-                break
-            }
-            itemIndex++ // contact header; only the newly opened group has rows
+            if (recordingGroupKey(group.first()) == key) return index
+            index++
         }
-        targetIndex?.let { index ->
-            // Wait for the LazyColumn to recompose after the old group collapsed.
-            withFrameNanos { }
-            if (abs(historyListState.firstVisibleItemIndex - index) > 15) {
-                historyListState.scrollToItem(index)
-            } else {
-                historyListState.animateScrollToItem(index)
-            }
-        }
-        if (scrollToExpanded == target) scrollToExpanded = null
+        return 0
     }
 
     Scaffold(
@@ -247,15 +230,13 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                                 expanded = expanded == groupKey,
                                 onClick = {
                                     if (selected.isEmpty()) {
-                                        if (expanded == groupKey) {
-                                            expanded = null
-                                            scrollToExpanded = null
-                                            active = null
-                                        } else {
-                                            active = null
-                                            expanded = groupKey
-                                            scrollToExpanded = groupKey
-                                        }
+                                        // Collapse/expand and update the scroll anchor in
+                                        // the SAME frame. An asynchronous scroll after
+                                        // collapsing can let LazyColumn preserve an obsolete
+                                        // child index and jump unrelated contacts offscreen.
+                                        historyListState.requestScrollToItem(headerIndex(groupKey))
+                                        active = null
+                                        expanded = if (expanded == groupKey) null else groupKey
                                     } else {
                                         group.forEach { file ->
                                             val id = file.uri.toString()
@@ -264,9 +245,9 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                                     }
                                 },
                                 onLongClick = {
+                                    historyListState.requestScrollToItem(headerIndex(groupKey))
                                     active = null
                                     expanded = groupKey
-                                    scrollToExpanded = groupKey
                                     group.forEach { file ->
                                         val id = file.uri.toString()
                                         if (id !in selected) selected.add(id)
