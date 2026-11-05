@@ -26,3 +26,13 @@ jobs:
       - name: Build and test
         # Debug build only since release builds require a signing key
         run: ./gradlew --no-daemon assembleDebug zipDebug
+
+      - name: Upload Debug APK and Magisk ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: BCR-native-manager-debug
+          path: |
+            app/build/outputs/apk/debug/*.apk
+            app/build/distributions/**/*.zip
+          if-no-files-found: error
+          compression-level: 9
