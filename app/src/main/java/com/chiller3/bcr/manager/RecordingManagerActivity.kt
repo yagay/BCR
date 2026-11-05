@@ -280,7 +280,6 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                                 detail = DateFormat.getTimeInstance(DateFormat.SHORT)
                                     .format(Date(first.timestamp)) + " · ${group.size} recording" +
                                     if (group.size == 1) "" else "s",
-                                count = group.size,
                                 expanded = expanded == groupKey,
                                 onClick = {
                                     if (selected.isEmpty()) {
