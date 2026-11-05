@@ -219,7 +219,10 @@ internal fun RecordingHistoryRow(
 }
 
 @Composable
-internal fun RecordingFileDetails(recording: ManagedRecording) {
+internal fun RecordingFileDetails(
+    recording: ManagedRecording,
+    onOpenExternal: () -> Unit,
+) {
     Column(
         Modifier.fillMaxWidth().padding(start = 68.dp, end = 16.dp, bottom = 8.dp, top = 2.dp),
         verticalArrangement = Arrangement.spacedBy(3.dp),
@@ -256,6 +259,9 @@ internal fun RecordingFileDetails(recording: ManagedRecording) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        TextButton(onClick = onOpenExternal) {
+            Text("Open with another player", style = MaterialTheme.typography.labelMedium)
+        }
     }
 }
 
