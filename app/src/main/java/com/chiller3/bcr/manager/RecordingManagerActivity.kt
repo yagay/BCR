@@ -14,6 +14,7 @@ import java.util.Locale
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
@@ -150,28 +151,7 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                 },
             )
         },
-        bottomBar = {
-            if (selected.isEmpty()) {
-                active?.let { file ->
-                    key(file.uri) { RecordingPlayer(
-                        recording = file,
-                        onClose = { active = null },
-                        onShare = {
-                            val uri = RecorderProvider.fromOrigUri(file.uri)
-                            val intent = Intent(Intent.ACTION_SEND).apply {
-                                type = file.file.type ?: "audio/*"
-                                putExtra(Intent.EXTRA_STREAM, uri)
-                                clipData = ClipData.newUri(context.contentResolver, "Recording", uri)
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            }
-                            runCatching {
-                                context.startActivity(Intent.createChooser(intent, "Share recording"))
-                            }.onFailure { operationMessage = it.localizedMessage ?: "Sharing failed" }
-                        },
-                    ) }
-                }
-            }
-        },
+
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             OutlinedTextField(
@@ -249,21 +229,51 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                         if (expanded == groupKey) {
                             items(group, key = { file -> "recording:${file.uri}" }) { file ->
                                 val id = file.uri.toString()
-                                RecordingHistoryRow(
-                                    recording = file,
-                                    checked = if (selected.isEmpty()) null else id in selected,
-                                    onClick = {
-                                        if (selected.isNotEmpty()) {
-                                            if (id in selected) selected.remove(id)
-                                            else selected.add(id)
-                                        } else active = file
-                                    },
-                                    onLongClick = {
-                                        active = null
-                                        if (id !in selected) selected.add(id)
-                                    },
-                                    onPlay = { active = file },
-                                )
+                                Column(Modifier.fillMaxWidth().animateContentSize()) {
+                                    RecordingHistoryRow(
+                                        recording = file,
+                                        checked = if (selected.isEmpty()) null else id in selected,
+                                        onClick = {
+                                            if (selected.isNotEmpty()) {
+                                                if (id in selected) selected.remove(id)
+                                                else selected.add(id)
+                                            } else {
+                                                active = if (active?.uri == file.uri) null else file
+                                            }
+                                        },
+                                        onLongClick = {
+                                            active = null
+                                            if (id !in selected) selected.add(id)
+                                        },
+                                        onPlay = {
+                                            active = if (active?.uri == file.uri) null else file
+                                        },
+                                    )
+                                    if (selected.isEmpty() && active?.uri == file.uri) {
+                                        key(file.uri) {
+                                            RecordingPlayer(
+                                                recording = file,
+                                                onClose = { active = null },
+                                                onShare = {
+                                                    val uri = RecorderProvider.fromOrigUri(file.uri)
+                                                    val intent = Intent(Intent.ACTION_SEND).apply {
+                                                        type = file.file.type ?: "audio/*"
+                                                        putExtra(Intent.EXTRA_STREAM, uri)
+                                                        clipData = ClipData.newUri(context.contentResolver, "Recording", uri)
+                                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                    }
+                                                    runCatching {
+                                                        context.startActivity(
+                                                            Intent.createChooser(intent, "Share recording")
+                                                        )
+                                                    }.onFailure {
+                                                        operationMessage = it.localizedMessage ?: "Sharing failed"
+                                                    }
+                                                },
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                         item(key = "divider:$groupKey") {
@@ -389,7 +399,7 @@ private fun RecordingPlayer(
             delay(250)
         }
     }
-    Column(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.navigationBars).padding(12.dp)) {
+    Column(Modifier.fillMaxWidth().padding(start = 68.dp, end = 16.dp, bottom = 12.dp)) {
         Text(recording.title, style = MaterialTheme.typography.titleMedium, maxLines = 1)
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         Slider(
