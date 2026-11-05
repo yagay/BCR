@@ -37,6 +37,32 @@ internal data class ManagedRecording(
 }
 
 internal class RecordingRepository(private val context: Context) {
+    // Full SAF enumeration remains authoritative: caching never hides new files.
+    private data class CachedMetadata(val modified: Long, val size: Long, val value: JSONObject)
+    private val jsonCache = LinkedHashMap<String, CachedMetadata>()
+
+    private fun readMetadata(file: DocumentFile): JSONObject? {
+        val uri = file.uri.toString()
+        val modified = file.lastModified()
+        val size = file.length()
+        if (modified > 0 && size > 0) {
+            val cached = jsonCache[uri]
+            if (cached != null && cached.modified == modified && cached.size == size) {
+                return cached.value
+            }
+        }
+        val parsed = runCatching {
+            context.contentResolver.openInputStream(file.uri)?.bufferedReader()?.use { reader ->
+                JSONObject(reader.readText())
+            }
+        }.getOrNull() ?: return null
+        if (modified > 0 && size > 0) {
+            if (jsonCache.size >= 512) jsonCache.remove(jsonCache.keys.first())
+            jsonCache[uri] = CachedMetadata(modified, size, parsed)
+        }
+        return parsed
+    }
+
     private val extensions = setOf("oga", "ogg", "m4a", "mp3", "wav", "flac", "amr", "3gp", "aac", "opus", "mka", "webm")
 
     // Default BCR filename layout, with optional direction/SIM/contact suffix.
@@ -81,13 +107,7 @@ internal class RecordingRepository(private val context: Context) {
             val name = file.name.orEmpty()
             val path = paths[file.uri.toString()].orEmpty()
             val companion = metadata[path.substringBeforeLast('.')]
-            val json = companion?.let {
-                runCatching {
-                    context.contentResolver.openInputStream(it.uri)?.bufferedReader()?.use { reader ->
-                        JSONObject(reader.readText())
-                    }
-                }.getOrNull()
-            }
+            val json = companion?.let(::readMetadata)
             val firstCall = json?.optJSONArray("calls")?.optJSONObject(0)
             val output = json?.optJSONObject("output")
             val recordingJson = output?.optJSONObject("recording")
