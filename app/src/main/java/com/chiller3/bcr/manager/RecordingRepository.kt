@@ -150,6 +150,7 @@ internal class RecordingRepository(private val context: Context) {
             listOfNotNull(prefs.filenameTemplate, Preferences.DEFAULT_FILENAME_TEMPLATE).distinct()
         )
         val audio = LinkedHashMap<String, RecordingCandidate>()
+        val unrecognized = mutableListOf<RecordingCandidate>()
         val sidecars = mutableMapOf<String, DocumentFile>()
         var primaryAccessible = false
 
@@ -186,11 +187,27 @@ internal class RecordingRepository(private val context: Context) {
                             file.uri.toString(),
                             RecordingCandidate(file, relative, rootUri.toString()),
                         )
+                    } else if (name.substringAfterLast('.', "").lowercase(Locale.ROOT) !in
+                        setOf("txt", "log", "zip", "xml", "nfo", "db")) {
+                        // Some SAF providers return application/octet-stream or
+                        // no extension for BCR's audio files. Only accept those
+                        // when a BCR JSON sidecar confirms the audio container.
+                        unrecognized.add(RecordingCandidate(file, relative, rootUri.toString()))
                     }
                 }
             }
         }
         if (!primaryAccessible) throw IOException("BCR recording folder is not available")
+
+        for (candidate in unrecognized) {
+            val stem = candidate.relativePath.last().substringBeforeLast('.')
+            val sidecarKey = candidate.rootId + "/" +
+                candidate.relativePath.dropLast(1).joinToString("/") + "/" + stem
+            val json = sidecars[sidecarKey]?.let(::readMetadata)
+            if (json?.optJSONObject("output")?.optJSONObject("format") != null) {
+                audio.putIfAbsent(candidate.file.uri.toString(), candidate)
+            }
+        }
 
         return audio.values.map { candidate ->
             val file = candidate.file
