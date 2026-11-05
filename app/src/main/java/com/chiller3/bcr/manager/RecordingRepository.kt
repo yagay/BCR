@@ -95,8 +95,14 @@ internal class RecordingRepository(private val context: Context) {
                 ?: number.ifBlank { name.substringBeforeLast('.') }
             val filenameTimestamp = fallback?.groupValues?.get(1)?.let { encoded ->
                 runCatching {
-                    val compact = encoded.substringBefore('.').substringBefore('+').substringBeforeLast('-')
-                    SimpleDateFormat("yyyyMMdd_HHmmss", Locale.ROOT).apply { isLenient = false }.parse(compact)?.time
+                    val parts = Regex("""^(\\d{8}_\\d{6})(?:\\.(\\d{1,3}))?([+-]\\d{4})?$""")
+                        .matchEntire(encoded) ?: return@runCatching null
+                    val millis = parts.groupValues[2].padEnd(3, '0').ifBlank { "000" }
+                    val offset = parts.groupValues[3]
+                    val pattern = if (offset.isNotEmpty()) "yyyyMMdd_HHmmss.SSSZ"
+                        else "yyyyMMdd_HHmmss.SSS"
+                    SimpleDateFormat(pattern, Locale.ROOT).apply { isLenient = false }
+                        .parse(parts.groupValues[1] + "." + millis + offset)?.time
                 }.getOrNull()
             }
             ManagedRecording(
