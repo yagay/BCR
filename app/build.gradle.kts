@@ -134,6 +134,9 @@ android {
         buildConfigField("String", "PROJECT_URL_AT_COMMIT",
             "\"${projectUrl}/tree/${gitVersionTriple.third.name}\"")
 
+        val suiteEnabled = providers.gradleProperty("suiteEnabled").orNull == "true"
+        manifestPlaceholders["bcrSettingsLauncherEnabled"] = (!suiteEnabled).toString()
+        buildConfigField("boolean", "BCR_GUI_ENABLED", suiteEnabled.toString())
         buildConfigField("String", "PROVIDER_AUTHORITY",
             "APPLICATION_ID + \".provider\"")
         resValue("string", "provider_authority", "$applicationId.provider")
@@ -198,6 +201,7 @@ kotlin {
 }
 
 dependencies {
+    if (providers.gradleProperty("suiteEnabled").orNull == "true") implementation(project(":bcrgui-bridge"))
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.material3)

@@ -8,6 +8,9 @@ on:
 jobs:
   build:
     name: Build project
+    # feature/bcr-gui-suite is already built and tested by suite.yml.
+    # Never launch a second, standalone core Debug APK for that PR/branch.
+    if: ${{ !(github.event_name == 'pull_request' && github.head_ref == 'feature/bcr-gui-suite') && !(github.event_name == 'workflow_dispatch' && github.ref_name == 'feature/bcr-gui-suite') }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -32,9 +35,10 @@ jobs:
           test -s app/src/main/resources/META-INF/xposed/module.prop
           test -s app/src/main/resources/META-INF/xposed/scope.list
 
-      - name: Build and test
-        # Debug build only since release builds require a signing key
-        run: ./gradlew --no-daemon --stacktrace :app:assembleDebug :app:testDebugUnitTest -x :app:archive
+      - name: Build and test BCR core (Suite is covered by suite.yml)
+        # This generic PR check must not require GUI node_modules or copied
+        # Capacitor assets. The dedicated Suite workflow builds both together.
+        run: ./gradlew -PsuiteEnabled=false --no-daemon --stacktrace :app:assembleDebug :app:testDebugUnitTest -x :app:archive
 
       - name: Print libxposed dependency SHA-512 for strict pinning
         if: always()
