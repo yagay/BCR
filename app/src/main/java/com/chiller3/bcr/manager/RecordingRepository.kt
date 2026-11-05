@@ -129,12 +129,6 @@ internal class RecordingRepository(private val context: Context) {
                 ?: number.takeIf { it.isNotBlank() }?.let {
                     runCatching { PhoneNumber(it).format(context, PhoneNumberUtil.PhoneNumberFormat.E164) }.getOrNull()
                 }
-            // val title was computed above
-            /*
-                ?: json?.optString("call_log_name")?.let(::clean)
-                ?: firstCall?.optString("caller_name")?.let(::clean)
-                ?: fallback?.groupValues?.get(4)?.let(::clean)
-                ?: number.ifBlank { name.substringBeforeLast('.') } */
             val filenameTimestamp = fallback?.groupValues?.get(1)?.let { encoded ->
                 runCatching {
                     val parts = Regex("""^(\d{8}_\d{6})(?:\.(\d{1,3}))?([+-]\d{4})?$""")
