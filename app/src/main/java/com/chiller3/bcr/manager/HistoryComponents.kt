@@ -8,16 +8,18 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.painterResource
+import com.chiller3.bcr.R
+import java.text.DateFormat
+import java.util.Date
 
 internal fun durationLabel(seconds: Long): String =
     if (seconds <= 0L) "—" else "%02d:%02d".format(seconds / 60, seconds % 60)
@@ -43,30 +45,25 @@ internal fun dialablePhoneNumber(value: String): String? {
 
 @Composable
 internal fun RecordingContactDetails(
-    name: String,
     numbers: List<String>,
     onDial: (String) -> Unit,
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(start = 68.dp, end = 16.dp, bottom = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier.fillMaxWidth()
+            .padding(start = 68.dp, end = 16.dp, bottom = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Text(
-            text = "Contact details",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(name, style = MaterialTheme.typography.bodyMedium)
         if (numbers.isEmpty()) {
             Text(
-                "No phone number in this recording",
+                "No phone number available",
+                modifier = Modifier.padding(vertical = 6.dp),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
             numbers.forEach { number ->
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
@@ -77,11 +74,16 @@ internal fun RecordingContactDetails(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    TextButton(onClick = { onDial(number) }) { Text("Dial") }
+                    IconButton(onClick = { onDial(number) }) {
+                        Icon(
+                            painterResource(R.drawable.ic_manager_phone),
+                            contentDescription = "Dial $number",
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 }
             }
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 
@@ -91,7 +93,7 @@ internal fun HistoryDateHeader(text: String) {
         text = text,
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.fillMaxWidth().padding(start = 20.dp, top = 14.dp, bottom = 6.dp),
+        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 10.dp, bottom = 3.dp),
     )
 }
 
@@ -108,12 +110,12 @@ internal fun CallHistoryRow(
     Row(
         modifier = Modifier.fillMaxWidth().combinedClickable(
             onClick = onClick, onLongClick = onLongClick,
-        ).padding(horizontal = 16.dp, vertical = 12.dp),
+        ).padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Box(
-            modifier = Modifier.size(44.dp).clip(CircleShape)
+            modifier = Modifier.size(40.dp).clip(CircleShape)
                 .background(MaterialTheme.colorScheme.secondaryContainer),
             contentAlignment = Alignment.Center,
         ) {
@@ -123,7 +125,7 @@ internal fun CallHistoryRow(
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
             )
         }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(detail, style = MaterialTheme.typography.bodySmall,
@@ -136,9 +138,15 @@ internal fun CallHistoryRow(
                     modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp))
             }
         }
-        Text(if (expanded) "⌃" else "⌄",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.titleLarge)
+        Icon(
+            painterResource(
+                if (expanded) R.drawable.ic_manager_chevron_up
+                else R.drawable.ic_manager_chevron_down
+            ),
+            contentDescription = if (expanded) "Collapse" else "Expand",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp),
+        )
     }
 }
 
@@ -154,15 +162,16 @@ internal fun RecordingHistoryRow(
     Row(
         modifier = Modifier.fillMaxWidth().combinedClickable(
             onClick = onClick, onLongClick = onLongClick,
-        ).padding(start = 68.dp, end = 16.dp, top = 7.dp, bottom = 7.dp),
+        ).padding(start = 68.dp, end = 16.dp, top = 2.dp, bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (checked != null) {
             Checkbox(checked = checked, onCheckedChange = { onClick() })
         }
-        Column(Modifier.weight(1f)) {
-            Text(recording.dateLabel, style = MaterialTheme.typography.bodyMedium,
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            Text(DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(recording.timestamp)),
+                style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
                 "${directionLabel(recording.direction)} · ${durationLabel(recording.durationSeconds)}",
@@ -171,7 +180,13 @@ internal fun RecordingHistoryRow(
             )
         }
         if (checked == null) {
-            TextButton(onClick = onPlay) { Text("▶ Play") }
+            IconButton(onClick = onPlay) {
+                Icon(
+                    painterResource(R.drawable.ic_manager_play),
+                    contentDescription = "Play recording",
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
         }
     }
 }
