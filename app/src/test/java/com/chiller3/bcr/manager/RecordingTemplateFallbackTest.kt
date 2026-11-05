@@ -31,6 +31,17 @@ class RecordingTemplateFallbackTest {
     }
 
     @Test
+    fun customUnixMillisecondsTemplate() {
+        val parser = RecordingTemplateFallback(
+            listOf(Template("{contact_name}/{date:unix_ms}_{direction}"))
+        )
+        assertEquals(
+            1762381200123L,
+            parser.unixTimestampMillis("Hospital/1762381200123_out"),
+        )
+    }
+
+    @Test
     fun ambiguousAdjacentVariablesNotGuessed() {
         val parser = RecordingTemplateFallback(
             listOf(Template("{contact_name}{phone_number}"))
