@@ -147,11 +147,12 @@ private fun ManagerScreen(onSettings: () -> Unit) {
 
     // Defer slow duration probing until a contact is opened. This keeps
     // initial history loading responsive even with thousands of recordings.
-    LaunchedEffect(expanded) {
+    LaunchedEffect(expanded, showAllExpanded) {
         val key = expanded ?: return@LaunchedEffect
-        val missing = recordings.filter {
-            recordingGroupKey(it) == key && it.durationSeconds <= 0L
-        }
+        val currentGroup = recordings.filter { recordingGroupKey(it) == key }
+            .sortedByDescending { it.timestamp }
+        val visible = if (showAllExpanded) currentGroup else currentGroup.take(4)
+        val missing = visible.filter { it.durationSeconds <= 0L }
         if (missing.isNotEmpty()) {
             val durations = withContext(Dispatchers.IO) {
                 missing.associate { it.uri.toString() to repository.readDuration(it) }
@@ -230,7 +231,15 @@ private fun ManagerScreen(onSettings: () -> Unit) {
         Column(Modifier.fillMaxSize().padding(padding)) {
             if (searchVisible) {
                 OutlinedTextField(
-                    value = query, onValueChange = { query = it },
+                    value = query, onValueChange = {
+                        query = it
+                        if (active != null || expanded != null) {
+                            active = null
+                            expanded = null
+                            showAllExpanded = false
+                            historyListState.requestScrollToItem(0)
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                     placeholder = { Text("Search contact, number or file") },
                     leadingIcon = { Icon(painterResource(R.drawable.ic_manager_search), contentDescription = null) },
