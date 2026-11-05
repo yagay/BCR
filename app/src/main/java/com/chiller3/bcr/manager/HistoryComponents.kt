@@ -174,6 +174,7 @@ internal fun RecordingHistoryRow(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     onPlay: () -> Unit,
+    onDetails: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().combinedClickable(
@@ -202,7 +203,11 @@ internal fun RecordingHistoryRow(
             )
         }
         if (checked == null) {
-            IconButton(onClick = onPlay) {
+            IconButton(onClick = onDetails, modifier = Modifier.size(40.dp)) {
+                Icon(painterResource(R.drawable.ic_manager_info),
+                    contentDescription = "Recording details", modifier = Modifier.size(20.dp))
+            }
+            IconButton(onClick = onPlay, modifier = Modifier.size(40.dp)) {
                 Icon(
                     painterResource(R.drawable.ic_manager_play),
                     contentDescription = "Play recording",
@@ -211,4 +216,35 @@ internal fun RecordingHistoryRow(
             }
         }
     }
+}
+
+@Composable
+internal fun RecordingFileDetails(recording: ManagedRecording) {
+    Column(
+        Modifier.fillMaxWidth().padding(start = 68.dp, end = 16.dp, bottom = 8.dp, top = 2.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Text("File: ${recording.file.name.orEmpty()}",
+            style = MaterialTheme.typography.bodySmall)
+        Text(
+            buildString {
+                append("Format: ${recording.format.ifBlank { "Unknown" }}")
+                if (recording.sizeBytes >= 0) append(" · Size: ${formatFileSize(recording.sizeBytes)}")
+                recording.simSlot?.let { append(" · SIM ${it + 1}") }
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            "Recorded: ${recording.dateLabel} · Length: ${durationLabel(recording.durationSeconds)}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+private fun formatFileSize(bytes: Long): String = when {
+    bytes < 1024 -> "$bytes B"
+    bytes < 1024 * 1024 -> "%.1f KB".format(bytes / 1024.0)
+    else -> "%.1f MB".format(bytes / 1048576.0)
 }
