@@ -23,6 +23,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.chiller3.bcr.RecorderProvider
 import com.chiller3.bcr.settings.SettingsActivity
 import com.chiller3.bcr.ui.theme.AppTheme
@@ -45,6 +48,17 @@ class RecordingManagerActivity : ComponentActivity() {
     }
 }
 
+/** Stable grouping key: unknown/private callers must never collapse into one contact. */
+private fun recordingGroupKey(file: ManagedRecording): String {
+    val digits = file.number.filter(Char::isDigit)
+    if (digits.length >= 7) return "number:$digits"
+    val name = file.title.trim().lowercase()
+    if (name.isBlank() || name in setOf("unknown", "<unknown>", "private", "blocked", "anonymous", "unavailable")) {
+        return "recording:${file.uri}"
+    }
+    return "name:$name"
+}
+
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun ManagerScreen(onSettings: () -> Unit) {
@@ -62,6 +76,19 @@ private fun ManagerScreen(onSettings: () -> Unit) {
     val selected = remember { mutableStateListOf<String>() }
     var confirmDelete by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
+    // Re-index completed BCR recordings whenever the manager returns to the foreground.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        var skipInitialResume = true
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                if (skipInitialResume) skipInitialResume = false
+                else refresh++
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     var operationMessage by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(refresh) {
@@ -86,10 +113,8 @@ private fun ManagerScreen(onSettings: () -> Unit) {
             (r.title.contains(query, true) || r.number.contains(query, true) ||
                 r.file.name.orEmpty().contains(query, true))
     }
-    val groups = filtered.groupBy { r ->
-        r.number.filter(Char::isDigit).takeIf { it.length >= 7 }
-            ?: r.title.lowercase().trim()
-    }.values.map { it.sortedByDescending(ManagedRecording::timestamp) }
+    val groups = filtered.groupBy(::recordingGroupKey)
+        .values.map { it.sortedByDescending(ManagedRecording::timestamp) }
         .sortedByDescending { it.first().timestamp }
 
     Scaffold(
@@ -164,8 +189,7 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                 else -> LazyColumn(Modifier.weight(1f)) {
                     items(groups, key = { it.first().uri.toString() }) { group ->
                         val first = group.first()
-                        val groupKey = first.number.filter(Char::isDigit)
-                            .takeIf { it.length >= 7 } ?: first.title.lowercase().trim()
+                        val groupKey = recordingGroupKey(first)
                         val open = expanded == groupKey || selected.isNotEmpty()
                         Row(
                             Modifier.fillMaxWidth().combinedClickable(
