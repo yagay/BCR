@@ -11,6 +11,8 @@ import android.net.Uri
 import android.media.MediaMetadataRetriever
 import androidx.documentfile.provider.DocumentFile
 import com.chiller3.bcr.Preferences
+import com.chiller3.bcr.output.PhoneNumber
+import com.google.i18n.phonenumbers.PhoneNumberUtil
 import com.chiller3.bcr.extension.toDocumentFile
 import org.json.JSONObject
 import java.text.SimpleDateFormat
@@ -24,6 +26,7 @@ internal data class ManagedRecording(
     val title: String,
     val number: String,
     val normalizedNumber: String = "",
+    val contactName: String = "",
     val direction: String,
     val timestamp: Long,
     val durationSeconds: Long,
@@ -116,11 +119,22 @@ internal class RecordingRepository(private val context: Context) {
             val number = firstCall?.optString("phone_number_formatted")?.let(::clean)
                 ?: firstCall?.optString("phone_number")?.let(::clean)
                 ?: fallback?.groupValues?.get(3).orEmpty()
-            val title = firstCall?.optString("contact_name")?.let(::clean)
+            val contactName = firstCall?.optString("contact_name")?.let(::clean)
                 ?: json?.optString("call_log_name")?.let(::clean)
+            val title = contactName
                 ?: firstCall?.optString("caller_name")?.let(::clean)
                 ?: fallback?.groupValues?.get(4)?.let(::clean)
                 ?: number.ifBlank { name.substringBeforeLast('.') }
+            val e164 = firstCall?.optString("phone_number_e164")?.let(::clean)
+                ?: number.takeIf { it.isNotBlank() }?.let {
+                    runCatching { PhoneNumber(it).format(context, PhoneNumberUtil.PhoneNumberFormat.E164) }.getOrNull()
+                }
+            // val title was computed above
+            /*
+                ?: json?.optString("call_log_name")?.let(::clean)
+                ?: firstCall?.optString("caller_name")?.let(::clean)
+                ?: fallback?.groupValues?.get(4)?.let(::clean)
+                ?: number.ifBlank { name.substringBeforeLast('.') } */
             val filenameTimestamp = fallback?.groupValues?.get(1)?.let { encoded ->
                 runCatching {
                     val parts = Regex("""^(\d{8}_\d{6})(?:\.(\d{1,3}))?([+-]\d{4})?$""")
@@ -138,7 +152,8 @@ internal class RecordingRepository(private val context: Context) {
                 metadata = companion,
                 title = title,
                 number = number,
-                normalizedNumber = firstCall?.optString("phone_number_e164")?.let(::clean).orEmpty(),
+                normalizedNumber = e164.orEmpty(),
+                contactName = contactName.orEmpty(),
                 direction = json?.optString("direction")?.let(::clean)
                     ?: fallback?.groupValues?.get(2).orEmpty(),
                 timestamp = json?.optLong("timestamp_unix_ms")?.takeIf { it > 0 }
