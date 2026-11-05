@@ -13,6 +13,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -60,6 +62,7 @@ private fun ManagerScreen(onSettings: () -> Unit) {
     val selected = remember { mutableStateListOf<String>() }
     var confirmDelete by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
+    var operationMessage by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(refresh) {
         loading = true
@@ -102,7 +105,7 @@ private fun ManagerScreen(onSettings: () -> Unit) {
         bottomBar = {
             if (selected.isEmpty()) {
                 active?.let { file ->
-                    RecordingPlayer(
+                    key(file.uri) { RecordingPlayer(
                         recording = file,
                         onClose = { active = null },
                         onShare = {
@@ -113,9 +116,11 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                                 clipData = ClipData.newUri(context.contentResolver, "Recording", uri)
                                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                             }
-                            context.startActivity(Intent.createChooser(intent, "Share recording"))
+                            runCatching {
+                                context.startActivity(Intent.createChooser(intent, "Share recording"))
+                            }.onFailure { operationMessage = it.localizedMessage ?: "Sharing failed" }
                         },
-                    )
+                    ) }
                 }
             }
         },
@@ -127,7 +132,8 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                 label = { Text("Search contact, number or file") }, singleLine = true,
             )
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 listOf("all" to "All", "in" to "Incoming", "out" to "Outgoing", "other" to "Other")
@@ -139,6 +145,8 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                         )
                     }
             }
+            operationMessage?.let { Text(it, Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant) }
             if (selected.isNotEmpty()) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     TextButton(onClick = {
@@ -230,12 +238,17 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                     if (files.any { it.uri == active?.uri }) active = null
                     scope.launch {
                         try {
-                            withContext(Dispatchers.IO) { repository.delete(files) }
-                            selected.clear()
+                            val deleted = withContext(Dispatchers.IO) { repository.delete(files) }
+                            if (deleted == files.size) {
+                                selected.clear()
+                                operationMessage = "$deleted recording(s) deleted"
+                            } else {
+                                operationMessage = "$deleted of ${files.size} deleted. Remaining recordings were kept."
+                            }
                             confirmDelete = false
                             refresh++
                         } catch (e: Exception) {
-                            error = e.localizedMessage ?: "Delete failed"
+                            operationMessage = e.localizedMessage ?: "Delete failed"
                             confirmDelete = false
                         } finally {
                             deleting = false
@@ -267,22 +280,55 @@ private fun RecordingPlayer(
 
     DisposableEffect(recording.uri) {
         val mp = MediaPlayer()
+        var released = false
+        player = null
+        playing = false
+        position = 0f
+        duration = 1f
+        error = null
         try {
             mp.setDataSource(context, recording.uri)
-            mp.prepare()
-            duration = mp.duration.coerceAtLeast(1).toFloat()
-            mp.setOnCompletionListener { playing = false; position = 0f }
-            player = mp
-            mp.start()
-            playing = true
-            error = null
+            mp.setOnPreparedListener {
+                if (!released) {
+                    duration = mp.duration.coerceAtLeast(1).toFloat()
+                    player = mp
+                    runCatching {
+                        mp.start()
+                        playing = true
+                    }.onFailure { error = it.localizedMessage ?: "Playback failed" }
+                }
+            }
+            mp.setOnCompletionListener {
+                if (!released) {
+                    playing = false
+                    position = 0f
+                    runCatching { mp.seekTo(0) }
+                }
+            }
+            mp.setOnErrorListener { _, _, _ ->
+                if (!released) {
+                    playing = false
+                    error = "Cannot play this recording"
+                }
+                true
+            }
+            // Never perform synchronous prepare() on the main/UI thread.
+            mp.prepareAsync()
         } catch (e: Exception) {
             error = e.localizedMessage ?: "Playback failed"
-            mp.release()
+            runCatching { mp.release() }
+            released = true
         }
         onDispose {
-            runCatching { mp.release() }
+            released = true
+            runCatching {
+                mp.setOnPreparedListener(null)
+                mp.setOnCompletionListener(null)
+                mp.setOnErrorListener(null)
+                mp.release()
+            }
             player = null
+            playing = false
         }
     }
     LaunchedEffect(player, playing) {
