@@ -74,7 +74,7 @@ class RecordingManagerActivity : ComponentActivity() {
 
 /** Stable grouping key: unknown/private callers must never collapse into one contact. */
 private fun recordingGroupKey(file: ManagedRecording): String {
-    val digits = file.number.filter(Char::isDigit)
+    val digits = (file.normalizedNumber.ifBlank { file.number }).filter(Char::isDigit)
     if (digits.length >= 7) return "number:$digits"
     val name = file.title.trim().lowercase()
     if (name.isBlank() || name in setOf("unknown", "<unknown>", "private", "blocked", "anonymous", "unavailable")) {
