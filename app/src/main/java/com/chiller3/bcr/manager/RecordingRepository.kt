@@ -32,18 +32,18 @@ internal data class ManagedRecording(
 }
 
 internal class RecordingRepository(private val context: Context) {
-    private val extensions = setOf("oga", "ogg", "m4a", "mp3", "wav", "flac", "amr", "3gp", "aac", "opus")
+    private val extensions = setOf("oga", "ogg", "m4a", "mp3", "wav", "flac", "amr", "3gp", "aac", "opus", "mka", "webm")
 
     // Default BCR filename layout, with optional direction/SIM/contact suffix.
     // Custom templates still work with JSON, otherwise keep a usable filename.
     private val defaultName = Regex(
-        """^(\\d{8}_\\d{6}(?:\\.\\d+)?(?:[+-]\\d{4})?)(?:_(in|out|conference))?(?:_sim\\d+)?(?:_([+\\d][+\\d -]*|unknown))?(?:_(.*))?$""",
+        """^(\d{8}_\d{6}(?:\.\d+)?(?:[+-]\d{4})?)(?:_(in|out|conference))?(?:_sim\d+)?(?:_([+\d][+\d -]*|unknown))?(?:_(.*))?$""",
         RegexOption.IGNORE_CASE,
     )
 
     fun scan(): List<ManagedRecording> {
         val root = Preferences(context).outputDirOrDefault.toDocumentFile(context)
-        if (!root.exists() || !root.isDirectory) return emptyList()
+        require(root.exists() && root.isDirectory) { "BCR recording folder is not available" }
 
         // BCR filename templates may contain subdirectories. Use an explicit
         // stack so a large recording collection doesn't overflow recursion.
@@ -83,19 +83,20 @@ internal class RecordingRepository(private val context: Context) {
                 }.getOrNull()
             }
             val firstCall = json?.optJSONArray("calls")?.optJSONObject(0)
+            fun clean(value: String?): String? = value?.takeIf { it.isNotBlank() && it != "null" }
             val fallback = defaultName.matchEntire(name.substringBeforeLast('.'))
-            val number = firstCall?.optString("phone_number_formatted")?.takeIf { it.isNotBlank() }
-                ?: firstCall?.optString("phone_number")?.takeIf { it.isNotBlank() }
+            val number = firstCall?.optString("phone_number_formatted")?.let(::clean)
+                ?: firstCall?.optString("phone_number")?.let(::clean)
                 ?: fallback?.groupValues?.get(3).orEmpty()
-            val title = firstCall?.optString("contact_name")?.takeIf { it.isNotBlank() }
-                ?: json?.optString("call_log_name")?.takeIf { it.isNotBlank() }
-                ?: firstCall?.optString("caller_name")?.takeIf { it.isNotBlank() }
-                ?: fallback?.groupValues?.get(4)?.takeIf { it.isNotBlank() }
+            val title = firstCall?.optString("contact_name")?.let(::clean)
+                ?: json?.optString("call_log_name")?.let(::clean)
+                ?: firstCall?.optString("caller_name")?.let(::clean)
+                ?: fallback?.groupValues?.get(4)?.let(::clean)
                 ?: number.ifBlank { name.substringBeforeLast('.') }
             val filenameTimestamp = fallback?.groupValues?.get(1)?.let { encoded ->
                 runCatching {
                     val compact = encoded.substringBefore('.').substringBefore('+').substringBeforeLast('-')
-                    SimpleDateFormat("yyyyMMdd_HHmmss", Locale.ROOT).parse(compact)?.time
+                    SimpleDateFormat("yyyyMMdd_HHmmss", Locale.ROOT).apply { isLenient = false }.parse(compact)?.time
                 }.getOrNull()
             }
             ManagedRecording(
@@ -103,7 +104,7 @@ internal class RecordingRepository(private val context: Context) {
                 metadata = companion,
                 title = title,
                 number = number,
-                direction = json?.optString("direction")?.takeIf { it.isNotBlank() }
+                direction = json?.optString("direction")?.let(::clean)
                     ?: fallback?.groupValues?.get(2).orEmpty(),
                 timestamp = json?.optLong("timestamp_unix_ms")?.takeIf { it > 0 }
                     ?: filenameTimestamp ?: file.lastModified(),
