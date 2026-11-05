@@ -190,11 +190,12 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                     items(groups, key = { it.first().uri.toString() }) { group ->
                         val first = group.first()
                         val groupKey = recordingGroupKey(first)
-                        val open = expanded == groupKey || selected.isNotEmpty()
+                        val open = expanded == groupKey
                         Row(
                             Modifier.fillMaxWidth().combinedClickable(
                                 onClick = { expanded = if (open) null else groupKey },
                                 onLongClick = {
+                                    expanded = groupKey
                                     // Select this contact's recordings together.
                                     group.forEach { file ->
                                         val key = file.uri.toString()
