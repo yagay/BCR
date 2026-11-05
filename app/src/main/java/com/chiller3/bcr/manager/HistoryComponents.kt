@@ -197,7 +197,7 @@ internal fun RecordingHistoryRow(
                     "conference" -> "◈"
                     else -> "•"
                 }}  ${durationLabel(recording.durationSeconds)}" +
-                    (recording.simSlot?.let { " · SIM ${it + 1}" } ?: ""),
+                    (recording.simSlot?.let { " · SIM ${it}" } ?: ""),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -230,7 +230,7 @@ internal fun RecordingFileDetails(recording: ManagedRecording) {
             buildString {
                 append("Format: ${recording.format.ifBlank { "Unknown" }}")
                 if (recording.sizeBytes >= 0) append(" · Size: ${formatFileSize(recording.sizeBytes)}")
-                recording.simSlot?.let { append(" · SIM ${it + 1}") }
+                recording.simSlot?.let { append(" · SIM ${it}") }
             },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
