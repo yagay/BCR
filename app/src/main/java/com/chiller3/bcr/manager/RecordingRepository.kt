@@ -235,11 +235,7 @@ internal class RecordingRepository(private val context: Context) {
             }.distinct()
             val title = contactName ?: callerName
                 ?: clean(fallback?.groupValues?.get(4))
-                ?: number.ifBlank {
-                    candidate.relativePath.dropLast(1).lastOrNull()
-                        ?.takeIf { parent -> parent.isNotBlank() && parent != "." }
-                        ?: stem
-                }
+                ?: number.ifBlank { stem }
             val canonical = clean(firstCall?.optString("phone_number_e164"))
                 ?: number.takeIf { it.isNotEmpty() }?.let {
                     runCatching {
