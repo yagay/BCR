@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import com.chiller3.bcr.R
 import java.text.DateFormat
 import java.util.Date
@@ -102,7 +103,6 @@ internal fun HistoryDateHeader(text: String) {
 internal fun CallHistoryRow(
     title: String,
     detail: String,
-    count: Int,
     expanded: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
@@ -119,11 +119,20 @@ internal fun CallHistoryRow(
                 .background(MaterialTheme.colorScheme.secondaryContainer),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = title.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-            )
+            if (title.trim().firstOrNull()?.isLetter() == true) {
+                Text(
+                    text = title.trim().first().uppercaseChar().toString(),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+            } else {
+                Icon(
+                    painter = painterResource(R.drawable.ic_manager_person),
+                    contentDescription = null,
+                    modifier = Modifier.size(22.dp),
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+            }
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium,
@@ -132,12 +141,7 @@ internal fun CallHistoryRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        if (count > 1) {
-            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
-                Text(count.toString(), style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp))
-            }
-        }
+        // The recording count is in the subtitle, keeping the right edge uncluttered.
         Icon(
             painterResource(
                 if (expanded) R.drawable.ic_manager_chevron_up
@@ -162,7 +166,7 @@ internal fun RecordingHistoryRow(
     Row(
         modifier = Modifier.fillMaxWidth().combinedClickable(
             onClick = onClick, onLongClick = onLongClick,
-        ).padding(start = 68.dp, end = 16.dp, top = 2.dp, bottom = 2.dp),
+        ).padding(start = 68.dp, end = 16.dp, top = 1.dp, bottom = 1.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -174,7 +178,12 @@ internal fun RecordingHistoryRow(
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                "${directionLabel(recording.direction)} · ${durationLabel(recording.durationSeconds)}",
+                "${when (recording.direction) {
+                    "in" -> "↙"
+                    "out" -> "↗"
+                    "conference" -> "◈"
+                    else -> "•"
+                }}  ${durationLabel(recording.durationSeconds)}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
