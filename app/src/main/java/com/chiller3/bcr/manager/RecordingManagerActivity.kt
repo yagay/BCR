@@ -107,6 +107,26 @@ private fun ManagerScreen(onSettings: () -> Unit) {
         }
     }
 
+    // Defer slow duration probing until a contact is opened. This keeps
+    // initial history loading responsive even with thousands of recordings.
+    LaunchedEffect(expanded) {
+        val key = expanded ?: return@LaunchedEffect
+        val missing = recordings.filter {
+            recordingGroupKey(it) == key && it.durationSeconds <= 0L
+        }
+        if (missing.isNotEmpty()) {
+            val durations = withContext(Dispatchers.IO) {
+                missing.associate { it.uri.toString() to repository.readDuration(it) }
+            }
+            recordings = recordings.map { file ->
+                val duration = durations[file.uri.toString()] ?: 0L
+                if (file.durationSeconds <= 0 && duration > 0) {
+                    file.copy(durationSeconds = duration)
+                } else file
+            }
+        }
+    }
+
     val filtered = recordings.filter { r ->
         (direction == "all" || r.direction == direction ||
             (direction == "other" && r.direction !in setOf("in", "out"))) &&
