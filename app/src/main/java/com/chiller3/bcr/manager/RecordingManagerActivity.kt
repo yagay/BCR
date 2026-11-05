@@ -21,9 +21,11 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlin.math.abs
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -76,6 +78,8 @@ private fun ManagerScreen(onSettings: () -> Unit) {
     var query by remember { mutableStateOf("") }
     var direction by remember { mutableStateOf("all") }
     var expanded by remember { mutableStateOf<String?>(null) }
+    val historyListState = rememberLazyListState()
+    var scrollToExpanded by remember { mutableStateOf<String?>(null) }
     var active by remember { mutableStateOf<ManagedRecording?>(null) }
     val selected = remember { mutableStateListOf<String>() }
     var confirmDelete by remember { mutableStateOf(false) }
@@ -141,6 +145,41 @@ private fun ManagerScreen(onSettings: () -> Unit) {
         .values.map { it.sortedByDescending(ManagedRecording::timestamp) }
         .sortedByDescending { it.first().timestamp }
 
+
+    // After collapsing the previously expanded (possibly very long) group,
+    // locate the NEW group in the updated lazy-list structure, then put its
+    // header at the top of the viewport, below the fixed search/filter rows.
+    // Counting date headers here is essential: group index != lazy item index.
+    LaunchedEffect(scrollToExpanded) {
+        val target = scrollToExpanded ?: return@LaunchedEffect
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        var previousDay: String? = null
+        var itemIndex = 0
+        var targetIndex: Int? = null
+        for (group in groups) {
+            val day = dateFormat.format(Date(group.first().timestamp))
+            if (day != previousDay) {
+                itemIndex++
+                previousDay = day
+            }
+            if (recordingGroupKey(group.first()) == target) {
+                targetIndex = itemIndex
+                break
+            }
+            itemIndex++ // contact header; only the newly opened group has rows
+        }
+        targetIndex?.let { index ->
+            // Wait for the LazyColumn to recompose after the old group collapsed.
+            withFrameNanos { }
+            if (abs(historyListState.firstVisibleItemIndex - index) > 15) {
+                historyListState.scrollToItem(index)
+            } else {
+                historyListState.animateScrollToItem(index)
+            }
+        }
+        if (scrollToExpanded == target) scrollToExpanded = null
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -189,7 +228,7 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                 loading -> CircularProgressIndicator(Modifier.padding(24.dp))
                 error != null -> Text("Unable to scan recordings: $error", Modifier.padding(16.dp))
                 groups.isEmpty() -> Text("No recordings found", Modifier.padding(16.dp))
-                else -> LazyColumn(Modifier.weight(1f)) {
+                else -> LazyColumn(Modifier.weight(1f), state = historyListState) {
                     val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
                     var previousDay: String? = null
                     groups.forEach { group ->
@@ -208,7 +247,15 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                                 expanded = expanded == groupKey,
                                 onClick = {
                                     if (selected.isEmpty()) {
-                                        expanded = if (expanded == groupKey) null else groupKey
+                                        if (expanded == groupKey) {
+                                            expanded = null
+                                            scrollToExpanded = null
+                                            active = null
+                                        } else {
+                                            active = null
+                                            expanded = groupKey
+                                            scrollToExpanded = groupKey
+                                        }
                                     } else {
                                         group.forEach { file ->
                                             val id = file.uri.toString()
@@ -219,6 +266,7 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                                 onLongClick = {
                                     active = null
                                     expanded = groupKey
+                                    scrollToExpanded = groupKey
                                     group.forEach { file ->
                                         val id = file.uri.toString()
                                         if (id !in selected) selected.add(id)
