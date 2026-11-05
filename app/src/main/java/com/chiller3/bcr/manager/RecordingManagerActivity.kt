@@ -206,7 +206,7 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                             Column(Modifier.weight(1f)) {
                                 Text(first.title, style = MaterialTheme.typography.titleMedium)
                                 Text(
-                                    "${group.size} recording(s) · ${first.dateLabel}",
+                                    "${group.size} recording(s) · ${first.direction.ifBlank { "Call" }} · ${first.dateLabel}",
                                     style = MaterialTheme.typography.bodySmall,
                                 )
                             }
@@ -361,7 +361,7 @@ private fun RecordingPlayer(
             delay(250)
         }
     }
-    Column(Modifier.fillMaxWidth().padding(12.dp)) {
+    Column(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.navigationBars).padding(12.dp)) {
         Text(recording.title, style = MaterialTheme.typography.titleMedium, maxLines = 1)
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         Slider(
