@@ -377,8 +377,25 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                                     },
                                 )
                             }
-                            items(if (showAllExpanded) group else group.take(4),
-                                key = { file -> "recording:${file.uri}" }) { file ->
+                            val visibleRecordings = if (showAllExpanded) group else group.take(4)
+                            var previousRecordingDay: String? = null
+                            visibleRecordings.forEach { file ->
+                                val recordingDay = dateFormat.format(Date(file.timestamp))
+                                if (recordingDay != previousRecordingDay) {
+                                    item(key = "recording-date:$groupKey:$recordingDay") {
+                                        Text(
+                                            DateFormat.getDateInstance(DateFormat.MEDIUM)
+                                                .format(Date(file.timestamp)),
+                                            modifier = Modifier.padding(
+                                                start = 68.dp, top = 9.dp, bottom = 2.dp
+                                            ),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                    previousRecordingDay = recordingDay
+                                }
+                                item(key = "recording:${file.uri}") {
                                 val id = file.uri.toString()
                                 var detailsVisible by remember(file.uri) { mutableStateOf(false) }
                                 Column(Modifier.fillMaxWidth().animateContentSize()) {
@@ -430,6 +447,7 @@ private fun ManagerScreen(onSettings: () -> Unit) {
                                             )
                                         }
                                     }
+                                }
                                 }
                             }
                         }
