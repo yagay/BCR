@@ -4,7 +4,7 @@ This branch keeps BCR's original recorder, InCallService, Magisk ZIP and signing
 
 ## Installation and test
 
-1. Build the debug APK with `./gradlew :app:assembleDebug`. Install the APK normally. Do not replace your known-working recorder without a backup.
+1. Build the debug APK with `./gradlew :app:assembleXposedDebug`. Install the APK normally. Do not replace your known-working recorder without a backup.
 2. In LSPosed, enable BCR and select **System Framework (`system`)**, not Android System (`android`). Restart the device to load the `system_server` hook.
 3. Open BCR → LSPosed + Root integration. Check `CAPTURE_AUDIO_OUTPUT` and `CONTROL_INCALL_EXPERIENCE` Java permission status.
 4. Tap **Check KernelSU / su** to request Root. After the first device unlock, optionally run **Fix READ_CALL_LOG restriction with Root**; this uses BCR's existing CLI and does **not** grant signature permissions.
@@ -151,3 +151,8 @@ the BCR output is mono `VOICE_CALL` or stereo `VOICE_UPLINK_DOWNLINK`.
 A stereo recording downmixed by a player may be perceived as softer than
 a mixed mono recording. Digital gain cannot recover audio that Android
 does not capture.
+
+
+## Isolated fork flavor
+
+All fork-only classes, manifest components, recording manager icons and Xposed resources are now grouped under `app/src/xposed/`; extension tests are under `app/src/testXposed/`. For the upstream-sync process and remaining touchpoints, see `docs/SOURCE_ISOLATION.md`.

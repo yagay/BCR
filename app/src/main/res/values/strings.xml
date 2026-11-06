@@ -4,7 +4,6 @@
 -->
 <resources>
     <string name="app_name_full">Basic Call Recorder</string>
-    <string name="lsposed_module_description">Experimental BCR call recording permission integration. Recommended scope: System Framework (system). KernelSU root may still be required.</string>
 
     <!-- Preference headers -->
     <string name="pref_header_general">General</string>
@@ -22,8 +21,6 @@
     <string name="pref_output_dir_desc">Pick a directory to store recordings. Long press to open in file manager.</string>
 
     <string name="pref_output_format_name">Output format</string>
-    <string name="pref_recording_gain_name">Recording volume boost</string>
-    <string name="pref_recording_gain_desc">Digital gain for future BCR phone recordings. Off keeps the original audio. Higher settings make quiet voices louder, but can also boost background noise. Peaks are soft-limited.</string>
     <string name="pref_output_format_desc">Select an encoding format for the recordings.</string>
 
     <string name="pref_min_duration_name">Minimum recording duration</string>
