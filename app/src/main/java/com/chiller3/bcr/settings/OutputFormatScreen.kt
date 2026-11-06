@@ -52,6 +52,8 @@ fun OutputFormatScreen(onBack: () -> Unit) {
         onBack = onBack,
         onReset = {
             prefs.resetAllFormats()
+            // Reset the isolated extension setting as well, matching the old behavior.
+            gainPrefs.gainDb = 0
             reloadPrefs++
         },
     ) { params ->
