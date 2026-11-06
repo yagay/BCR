@@ -3,6 +3,7 @@ on:
     branches:
       - master
       - feature/lsposed-root
+      - refactor/xposed-source-isolation
   pull_request:
   workflow_dispatch:
 jobs:
@@ -28,13 +29,13 @@ jobs:
 
       - name: Verify LSPosed module resources
         run: |
-          test -s app/src/main/resources/META-INF/xposed/java_init.list
-          test -s app/src/main/resources/META-INF/xposed/module.prop
-          test -s app/src/main/resources/META-INF/xposed/scope.list
+          test -s app/src/xposed/resources/META-INF/xposed/java_init.list
+          test -s app/src/xposed/resources/META-INF/xposed/module.prop
+          test -s app/src/xposed/resources/META-INF/xposed/scope.list
 
       - name: Build and test
         # Debug build only since release builds require a signing key
-        run: ./gradlew --no-daemon --stacktrace :app:assembleDebug :app:testDebugUnitTest -x :app:archive
+        run: ./gradlew --no-daemon --stacktrace :app:assembleXposedDebug :app:testXposedDebugUnitTest -x :app:archive
 
       - name: Print libxposed dependency SHA-512 for strict pinning
         if: always()
@@ -49,7 +50,7 @@ jobs:
       - name: Verify LSPosed metadata inside Debug APK
         shell: bash
         run: |
-          apk="$(find app/build/outputs/apk/debug -maxdepth 1 -name "*.apk" -type f | head -n 1)"
+          apk="$(find app/build/outputs/apk/xposed/debug -maxdepth 1 -name "*.apk" -type f | head -n 1)"
           test -n "$apk"
           for path in module.prop java_init.list scope.list; do
             unzip -Z1 "$apk" | grep -Fx "META-INF/xposed/$path"
@@ -61,5 +62,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: BCR-native-lsposed-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          path: app/build/outputs/apk/xposed/debug/*.apk
           if-no-files-found: error

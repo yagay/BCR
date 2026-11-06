@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fork-only declarations, merged with the unchanged upstream BCR manifest. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <queries>
+        <package android:name="com.whatsapp" />
+        <package android:name="com.whatsapp.w4b" />
+        <package android:name="org.telegram.messenger" />
+        <package android:name="org.thunderdog.challegram" />
+        <package android:name="org.thoughtcrime.securesms" />
+        <package android:name="com.viber.voip" />
+        <package android:name="com.google.android.apps.tachyon" />
+        <package android:name="com.tencent.mm" />
+    </queries>
+    <application android:description="@string/lsposed_module_description">
+        <activity android:name=".settings.IntegrationActivity" android:exported="false" />
+        <activity android:name=".voip.VoipSettingsActivity" android:exported="false" />
+        <activity android:name=".manager.RecordingManagerActivity" android:exported="false" />
+        <activity-alias
+            android:name=".settings.SettingsActivityLauncher"
+            android:targetActivity=".manager.RecordingManagerActivity"
+            tools:replace="android:targetActivity" />
+        <service
+            android:name=".voip.VoipRecorderService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="User-initiated opt-in capture of VoIP communication audio" />
+        </service>
+        <service
+            android:name=".voip.VoipNotificationListener"
+            android:label="@string/app_name_full"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+    </application>
+</manifest>

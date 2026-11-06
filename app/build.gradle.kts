@@ -119,6 +119,12 @@ val archiveDir = extraDir.map { it.dir("archive") }
 android {
     namespace = "com.chiller3.bcr"
 
+    // Fork-only source-set overlay; the upstream core remains in src/main.
+    flavorDimensions += "integration"
+    productFlavors {
+        create("xposed") { dimension = "integration" }
+    }
+
     compileSdk = 37
     buildToolsVersion = "37.0.0"
 
@@ -165,6 +171,7 @@ android {
     }
     sourceSets {
         getByName("main") { resources.srcDirs("src/main/resources") }
+        getByName("xposed") { resources.srcDirs("src/xposed/resources") }
     }
     packaging.resources.merges += "META-INF/xposed/*"
     buildFeatures {

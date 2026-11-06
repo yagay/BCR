@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="lsposed_module_description">Experimental BCR call recording permission integration. Recommended scope: System Framework (system). KernelSU root may still be required.</string>
+    <string name="pref_recording_gain_name">Recording volume boost</string>
+    <string name="pref_recording_gain_desc">Digital gain for future BCR phone recordings. Off keeps the original audio. Higher settings make quiet voices louder, but can also boost background noise. Peaks are soft-limited.</string>
+</resources>
