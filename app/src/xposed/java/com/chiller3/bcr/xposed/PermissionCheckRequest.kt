@@ -16,7 +16,7 @@ internal data class PermissionCheckRequest(
     companion object {
         fun parse(
             kind: PermissionMethodClassifier.Kind,
-            args: Array<out Any?>,
+            args: List<Any?>,
         ): PermissionCheckRequest? = when (kind) {
             PermissionMethodClassifier.Kind.PACKAGE -> {
                 val permission = args.getOrNull(0) as? String
