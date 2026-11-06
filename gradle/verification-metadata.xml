@@ -3363,5 +3363,20 @@
             <sha512 value="a73ab4ca64743636f7f27d5cc5e5648edd11de8be8c4b9e006780099623c76fc70eee233935094739247f41097597c7606659be90c76868a991080048df1749b" origin="GitHub Actions dependency verification audit 41712598211"/>
          </artifact>
       </component>
+      <component group="androidx.annotation" name="annotation-jvm" version="1.7.0">
+         <artifact name="annotation-jvm-1.7.0.module">
+            <sha512 value="58e8dd3f215d348f6c783dbe9ec9dde9bab300eebb5bb0483ce20b2cfc42cedead78b7a18e9c930eb6886450cc0a50b86e9ad0c861514538b4429258f9f8894e" origin="Checked CI download: SHA-512"/>
+         </artifact>
+      </component>
+      <component group="org.jetbrains.kotlin" name="kotlin-stdlib" version="1.9.21">
+         <artifact name="kotlin-stdlib-1.9.21.module">
+            <sha512 value="94ce411cd0d597034fd08bb228cbd6e3e0f11a240b7be1afd4ecc84af4e5e7cb3496b0f662d006c36d37bf4a217eff2bc6a29252b50047c9bbdfb3eb0b8386c6" origin="Checked CI download: SHA-512"/>
+         </artifact>
+      </component>
+      <component group="androidx.lifecycle" name="lifecycle-common" version="2.3.1">
+         <artifact name="lifecycle-common-2.3.1.module">
+            <sha512 value="4e798df95a08fef11972ea001b6fb5078dd2156c74f199cce26dc810a00684938210fa9052b33ad670d3584a2bb0f7e209e8b08bb325439528512348b4a8dd7e" origin="Checked CI download: SHA-512"/>
+         </artifact>
+      </component>
    </components>
 </verification-metadata>
