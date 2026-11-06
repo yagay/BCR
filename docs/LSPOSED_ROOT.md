@@ -156,3 +156,8 @@ does not capture.
 ## Isolated fork flavor
 
 All fork-only classes, manifest components, recording manager icons and Xposed resources are now grouped under `app/src/xposed/`; extension tests are under `app/src/testXposed/`. For the upstream-sync process and remaining touchpoints, see `docs/SOURCE_ISOLATION.md`.
+
+
+## Permission-check argument safety
+
+The package-based AOSP method checks (permission, packageName, userId, ...), while the UID-based method checks (uid, permission, ...). PermissionCheckRequest now parses these signatures separately, returning null on unexpected arguments and retaining the original denial for other packages. The Java hook does not bypass native AudioPolicy/Telecom authorization. Regression tests cover both argument orders and malformed values.

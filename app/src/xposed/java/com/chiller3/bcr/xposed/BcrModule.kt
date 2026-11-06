@@ -65,21 +65,21 @@ class BcrModule : XposedModule() {
             val original = chain.proceed()
             if (original != PackageManager.PERMISSION_DENIED) return@Hooker original
 
-            val args = chain.args
-            val permission = args.getOrNull(1) as? String ?: return@Hooker original
-            if (permission !in PRIVILEGED_PERMISSIONS) return@Hooker original
+            // AOSP permission and UID checks have different argument orders.
+            val request = PermissionCheckRequest.parse(kind, chain.args)
+                ?: return@Hooker original
+            if (request.permission !in PRIVILEGED_PERMISSIONS) return@Hooker original
 
             val isBcr = when (kind) {
-                PermissionMethodClassifier.Kind.PACKAGE -> args.getOrNull(0) == PACKAGE_NAME
-                PermissionMethodClassifier.Kind.UID -> {
-                    val uid = args.getOrNull(0) as? Int ?: return@Hooker original
-                    belongsToBcr(uid)
-                }
+                PermissionMethodClassifier.Kind.PACKAGE ->
+                    request.packageName == PACKAGE_NAME
+                PermissionMethodClassifier.Kind.UID ->
+                    request.uid?.let(::belongsToBcr) == true
             }
             if (!isBcr) return@Hooker original
 
             if (grantLogCount.incrementAndGet() <= MAX_GRANT_LOGS) {
-                Log.w(TAG, "Java permission override for BCR: $permission, kind=$kind")
+                Log.w(TAG, "Java permission override for BCR: ${request.permission}, kind=$kind")
             }
             PackageManager.PERMISSION_GRANTED
         }
