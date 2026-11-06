@@ -4,6 +4,7 @@ on:
       - master
       - feature/lsposed-root
       - refactor/xposed-source-isolation
+      - lsposed
   pull_request:
   workflow_dispatch:
 jobs:
@@ -36,6 +37,20 @@ jobs:
       - name: Build and test
         # Debug build only since release builds require a signing key
         run: ./gradlew --no-daemon --stacktrace :app:assembleXposedDebug :app:testXposedDebugUnitTest -x :app:archive
+
+      - name: Diagnose missing Gradle verification metadata without disabling checks
+        if: failure()
+        shell: bash
+        run: |
+          for dependency in \
+            androidx.annotation/annotation-jvm/1.7.0 \
+            org.jetbrains.kotlin/kotlin-stdlib/1.9.21 \
+            androidx.lifecycle/lifecycle-common/2.3.1; do
+            dir="$HOME/.gradle/caches/modules-2/files-2.1/$dependency"
+            if [ -d "$dir" ]; then
+              find "$dir" -type f -name '*.module' -exec sha512sum {} +
+            fi
+          done
 
       - name: Print libxposed dependency SHA-512 for strict pinning
         if: always()

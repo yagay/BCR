@@ -22,6 +22,7 @@ import com.chiller3.bcr.extension.phoneNumber
 import com.chiller3.bcr.extension.threadIdCompat
 import com.chiller3.bcr.extension.toDocumentFile
 import com.chiller3.bcr.audio.PcmGain
+import com.chiller3.bcr.audio.RecordingGainPreferences
 import com.chiller3.bcr.format.Encoder
 import com.chiller3.bcr.format.Format
 import com.chiller3.bcr.output.CallMetadata
@@ -181,7 +182,7 @@ class RecorderThread(
         sampleRate = savedFormat.sampleRate ?: format.sampleRateInfo.default
 
         sources = savedFormat.audioSource.sources
-        pcmGain = PcmGain(prefs.recordingGainDb)
+        pcmGain = PcmGain(RecordingGainPreferences(context).gainDb)
     }
 
     fun onCallDetailsChanged(call: Call, details: Call.Details) {

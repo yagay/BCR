@@ -17,7 +17,7 @@ The upstream-facing `app/src/main/AndroidManifest.xml` and `app/src/main/res/val
 Moving source files reduces path collisions but does not eliminate upstream conflicts. These currently modified upstream-owned files remain integration touchpoints:
 
 - `app/build.gradle.kts`: flavor configuration, libxposed dependency and resource packaging.
-- `app/src/main/java/com/chiller3/bcr/Preferences.kt`: recording gain.
+- `app/src/xposed/java/com/chiller3/bcr/audio/RecordingGainPreferences.kt`: fork-owned gain preference, preserving the old device-protected key; upstream `Preferences.kt` is no longer patched.
 - `app/src/main/java/com/chiller3/bcr/RecorderInCallService.kt`: lifecycle diagnostic events.
 - `app/src/main/java/com/chiller3/bcr/RecorderThread.kt`: optional PCM gain.
 - `app/src/main/java/com/chiller3/bcr/settings/OutputFormatScreen.kt`: gain controls.
@@ -25,7 +25,7 @@ Moving source files reduces path collisions but does not eliminate upstream conf
 - `app/proguard-rules.pro` and `gradle/verification-metadata.xml`: build metadata.
 - `.github/workflows/ci.yml`: extension Debug CI.
 
-This change intentionally keeps the recording and UI logic intact. Long-term full separation would require **small, stable interface ports** for settings, recording events and PCM processing, backed by no-op upstream defaults.
+The gain preference was moved without changing its key, validation, or default. This change intentionally keeps the recording and UI logic intact. Long-term full separation would require **small, stable interface ports** for settings, recording events and PCM processing, backed by no-op upstream defaults.
 
 ## Debug build without Magisk ZIP
 
@@ -46,3 +46,7 @@ git merge upstream/master
 ```
 
 For production, first merge the reviewed isolation refactor into `feature/native-recordings-manager`, then synchronize upstream there. Resolve changes in the remaining touchpoints by inspection; never discard all fork edits in one command. Confirm the merged manifest still launches the native manager, the APK includes `META-INF/xposed`, and phone recordings retain their expected behavior.
+
+## CI dependency integrity
+
+Strict Gradle dependency verification remains enabled. If a newly introduced dependency's `.module` metadata is not pinned, CI prints its SHA-512 **without weakening verification**; add the reviewed hash to `gradle/verification-metadata.xml` before accepting a release. Never suppress verification for the whole build.

@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import com.chiller3.bcr.Preferences
+import com.chiller3.bcr.audio.RecordingGainPreferences
 import com.chiller3.bcr.R
 import com.chiller3.bcr.format.AudioSource
 import com.chiller3.bcr.format.Format
@@ -40,10 +41,11 @@ import com.chiller3.bcr.ui.theme.AppTheme
 fun OutputFormatScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { Preferences(context) }
+    val gainPrefs = remember { RecordingGainPreferences(context) }
 
     var reloadPrefs by remember { mutableIntStateOf(0) }
     val savedFormat = remember(reloadPrefs) { Format.fromPreferences(prefs) }
-    val recordingGainDb = remember(reloadPrefs) { prefs.recordingGainDb }
+    val recordingGainDb = remember(reloadPrefs) { gainPrefs.gainDb }
 
     AppScreen(
         title = { Text(text = stringResource(R.string.pref_output_format_name)) },
@@ -92,11 +94,11 @@ fun OutputFormatScreen(onBack: () -> Unit) {
                 reloadPrefs++
             },
             onGainChange = { value ->
-                prefs.recordingGainDb = value
+                gainPrefs.gainDb = value
                 reloadPrefs++
             },
             onGainReset = {
-                prefs.recordingGainDb = 0
+                gainPrefs.gainDb = 0
                 reloadPrefs++
             },
             contentPadding = params.contentPadding,
